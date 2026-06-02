@@ -1,0 +1,12 @@
+# Project Configurations
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  features_dir: "data/features"
+  reports_dir: "reports"
+
+data:
+  dictionary: "data/raw/SRI_Vehiculos_DD.xlsx"
+  files_pattern: "data/raw/SRI_Vehiculos_Nuevos_*.csv"
+  schema_config: "config/schemas.yaml"
