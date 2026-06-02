@@ -21,8 +21,7 @@ def main():
         # 2. Reporting
         os.path.join(base_dir, 'reporting/summary.py'),
         os.path.join(base_dir, 'reporting/quality.py'),
-        os.path.join(base_dir, 'reporting/volume.py'),
-        os.path.join(base_dir, 'reporting/proposals.py')
+        os.path.join(base_dir, 'reporting/volume.py')
     ]
     
     print("Executing complete vehicle data profiling and reporting pipeline...")
