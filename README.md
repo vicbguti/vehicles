@@ -27,3 +27,9 @@ This project focuses on performing an in-depth data quality and quantity analysi
   - `01_quality_audit.md`
   - `02_volume_audit.md`
   - `03_problem_proposals.md`
+
+## Data Source
+The raw data is sourced from the official **Servicio de Rentas Internas (SRI) de Ecuador** open data portal:
+* **Source URL**: [SRI Ecuador Datasets](https://www.sri.gob.ec/datasets)
+* **Dataset Name**: Matriculación Vehicular (Vehículos Nuevos)
+
