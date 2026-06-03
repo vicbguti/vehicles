@@ -9,6 +9,8 @@ This section outlines the constraints, manual baseline methodologies, and mathem
 * [greedy.md](./problem/greedy.md) — Analysis of why traditional greedy algorithms (nearest-canton first) fail.
 * [complexity.md](./problem/complexity.md) — The combinatorial math of the routing search space.
 * [intractability.md](./problem/intractability.md) — Mathematical proof showing why scaling the problem parameters makes exact solvers impossible in real-time.
+* [formulation.md](./problem/formulation.md) — Generalized algebraic mathematical formulation and cancellation proof of the search space.
+
 
 ## 📂 [Solution Design](./solution)
 This section documents the machine learning model, simulator loop, training viability, and runtime expectations:
