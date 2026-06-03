@@ -10,6 +10,8 @@ This section outlines the constraints, manual baseline methodologies, and mathem
 * [complexity.md](./problem/complexity.md) — The combinatorial math of the routing search space.
 * [intractability.md](./problem/intractability.md) — Mathematical proof showing why scaling the problem parameters makes exact solvers impossible in real-time.
 * [formulation.md](./problem/formulation.md) — Generalized algebraic mathematical formulation and cancellation proof of the search space.
+* [limits.md](./problem/limits.md) — Comparison of search space times with the world's fastest supercomputers and global compute limits.
+
 
 
 ## 📂 [Solution Design](./solution)
