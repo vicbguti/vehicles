@@ -38,11 +38,9 @@ Because vehicles cannot be divided, $X$ and $Y$ must be integers. We evaluate al
 ## 3. Valid Partition Configurations
 The exhaustive search proves that only three partition configurations are mathematically possible:
 
-### Configuration 1: Balanced Partition ($X = 2, Y = 6$)
-* **Truck 1**: 2 SUVs + 6 Sedans = $2(1.0) + 6(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100% full)
-* **Truck 2**: 2 SUVs + 6 Sedans = $2(1.0) + 6(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100% full)
+| Configuration | Truck 1 Load | Truck 2 Load | Truck 1 CUs | Truck 2 CUs |
+| :--- | :--- | :--- | :--- | :--- |
+| **Balanced** | 2 SUVs + 6 Sedans | 2 SUVs + 6 Sedans | $2(1.0) + 6(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100%) | $2(1.0) + 6(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100%) |
+| **Asymmetric A** | 0 SUVs + 9 Sedans | 4 SUVs + 3 Sedans | $9(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100%) | $4(1.0) + 3(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100%) |
+| **Asymmetric B** | 4 SUVs + 3 Sedans | 0 SUVs + 9 Sedans | $4(1.0) + 3(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100%) | $9(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100%) |
 
-### Configuration 2: Asymmetric Partition ($X = 0, Y = 9$ or $X = 4, Y = 3$)
-* **Truck 1**: 0 SUVs + 9 Sedans = $9(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100% full)
-* **Truck 2**: 4 SUVs + 3 Sedans = $4(1.0) + 3(\frac{2}{3}) = \mathbf{6.0 \text{ CUs}}$ (100% full)
-*(or vice versa)*

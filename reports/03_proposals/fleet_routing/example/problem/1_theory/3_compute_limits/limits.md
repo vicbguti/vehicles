@@ -7,8 +7,8 @@ The world's fastest supercomputer, **Frontier** (located at Oak Ridge National L
 
 * **Evaluation Overhead**: To check a single routing and packing combination (calculating distances, checking truck capacity constraints, and comparing results), a computer must execute at least **1,000 floating-point operations (FLOPs)**.
 * **Supercomputer Speed**: Working at 100% capacity, Frontier can process roughly **$1.2 \times 10^{15}$ combinations per second**.
-* **Time Required**: Finding the absolute mathematically optimal route for just **20 vehicles and 3 trucks** (using brute-force search) on the entire supercomputer would take:
-  $$\frac{1.29 \times 10^{23}}{1.2 \times 10^{15} \text{ combinations/sec}} \approx 107,500,000 \text{ seconds} \approx \mathbf{3.4 \text{ years}}$$
+* Time Required: Finding the absolute mathematically optimal route for just **20 vehicles and 3 trucks** (using brute-force search) on the entire supercomputer would take:
+  $$\frac{7.27 \times 10^{21}}{1.2 \times 10^{15} \text{ combinations/sec}} \approx 6,058,333 \text{ seconds} \approx \mathbf{70.1 \text{ days}}$$
 
 ---
 
