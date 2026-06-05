@@ -13,7 +13,6 @@ Because the size of the total candidate pool $M$ exceeds the capacity limit of t
 The number of possible candidate subsets to evaluate is given by the formula for non-empty proper subsets:
 $$\text{Selection Space} = 2^M - 2$$
 
-
 ---
 
 ## 2. Complexity Classification
@@ -21,5 +20,3 @@ This generalization proves that the selection space size is bounded by:
 $$\mathcal{O}(2^M)$$
 
 This represents exponential growth, confirming that even before considering the factorial complexity of routing sequences, the subset selection phase (modeled as a Multidimensional Knapsack Problem) is NP-hard and mathematically intractable to solve optimally via exhaustive search as $M$ scales.
-
-

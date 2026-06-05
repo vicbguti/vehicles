@@ -13,7 +13,6 @@ Let the partitioning variables be defined as:
 * $C_i$ = Capacity Unit (CU) limit of truck $i$
 * $w_j$ = Capacity Unit (CU) weight of vehicle $j \in S$
 
-
 We define the binary decision variable $x_{ij} \in \{0, 1\}$, where:
 $$x_{ij} = \begin{cases} 1 & \text{if vehicle } j \text{ is assigned to truck } i \\ 0 & \text{otherwise} \end{cases}$$
 
