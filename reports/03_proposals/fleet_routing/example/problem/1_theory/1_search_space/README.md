@@ -9,5 +9,6 @@ This directory contains documents exploring the combinatorial search space, scen
 * [3_capacity_constraints.md](./3_capacity_constraints.md) — Algebraic proof of vehicle class bounds ($S \le 4$, $D \ge 12$).
 * [4_size_feasibility.md](./4_size_feasibility.md) — Feasibility of subset sizes to determine maximum cargo size ($N = 16$).
 * [5_partition_feasibility.md](./5_partition_feasibility.md) — Mathematical constraints and proof of splits for Truck 1 and Truck 2.
-* [6_complexity.md](./6_complexity.md) — Product of grouping and routing permutations for the scenario.
-* [7_intractability.md](./7_intractability.md) — Scaled complexity showing NP-hardness.
+* [6_search_walkthrough.md](./6_search_walkthrough.md) — Walkthrough of tree-search and pruning on the 16-vehicle case.
+* [7_complexity.md](./7_complexity.md) — Product of grouping and routing permutations for the scenario.
+* [8_intractability.md](./8_intractability.md) — Scaled complexity showing NP-hardness.
