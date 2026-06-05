@@ -4,23 +4,25 @@ This document provides the generalized mathematical proof for the combinatorial 
 
 ## 1. Parameters
 Let the problem variables be defined as:
-* $M$ = total available candidate vehicles
-* $N$ = number of vehicles to select and deliver ($N \le M$)
+* $\mathcal{M}$ = set of available candidate vehicles, with size $M = |\mathcal{M}|$
+* $S$ = subset of selected vehicles to deliver ($\emptyset \subset S \subseteq \mathcal{M}$), with size $N = |S|$ (where $N \le M$)
 * $K$ = number of trucks
 * $c_i$ = capacity (number of vehicles) of truck $i$, where the capacities sum to the selected fleet size:
   $$\sum_{i=1}^K c_i = N$$
+
 
 ---
 
 ## 2. Component Combinations
 
 ### A. Vehicle Selection (Combinations)
-The number of ways to select $N$ vehicles from the $M$ available is:
+The number of ways to select $N$ vehicles from the $M$ available (the subset selection step detailed in [subset_selection.md](./subset_selection.md)) is:
 $$\text{Selection} = \binom{M}{N} = \frac{M!}{N!(M-N)!}$$
 
 ### B. Fleet Partitioning (Multinomial Distribution)
-The selected $N$ vehicles must be distributed onto the $K$ trucks of capacities $c_1, c_2, \dots, c_K$. The number of partition configurations is:
+The selected $N$ vehicles must be distributed onto the $K$ trucks of capacities $c_1, c_2, \dots, c_K$ (subject to the bin-packing constraints detailed in [bin_packing.md](./bin_packing.md)). The number of partition configurations is:
 $$\text{Distribution} = \binom{N}{c_1, c_2, \dots, c_K} = \frac{N!}{c_1! \cdot c_2! \cdots c_K!}$$
+
 
 ### C. Route Sequences (Permutations)
 For each truck $i$, the number of sequence paths to visit its $c_i$ destinations is $c_i!$. The total route sequences across all $K$ trucks is:
