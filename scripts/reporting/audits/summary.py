@@ -5,7 +5,7 @@ import yaml
 from glob import glob
 
 def main():
-    config_path = os.path.join(os.path.dirname(__file__), '../../config/config.yaml')
+    config_path = os.path.join(os.path.dirname(__file__), '../../../config/config.yaml')
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
         

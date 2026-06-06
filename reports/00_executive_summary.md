@@ -3,7 +3,6 @@
 This summary profiles the SRI New Vehicles dataset (spanning 2017–2026) to determine the viability of implementing machine learning and deep learning models.
 
 ## Dataset Profile At a Glance
-* **Official Source**: [SRI Ecuador Datasets Portal](https://www.sri.gob.ec/datasets)
 * **Temporal Coverage**: 2017 to 2026 (10 years of annual files)
 * **Total Volume**: 4,306,526 vehicle registration records
 * **Total Storage on Disk**: 677.99 MB

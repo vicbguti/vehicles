@@ -1,24 +1,28 @@
 import os
 import sys
-from run_profiling import run_profiling
-from run_reporting import run_reporting
 
-def main():
+# Add the reporting directory to Python path to import sub-runners
+sys.path.append(os.path.join(os.path.dirname(__file__), 'reporting'))
+
+from run_audits import run_audits
+from run_proposals import run_proposals
+
+def run_reporting():
     print("==============================================================")
-    print("Executing complete vehicle data profiling and reporting pipeline")
+    print("Executing report compilation phase")
     print("==============================================================")
     
-    # 1. Run Profiling
-    run_profiling()
+    # 1. Run Data Audits
+    run_audits()
     
     print("\n--------------------------------------------------------------")
     
-    # 2. Run Reporting
-    run_reporting()
+    # 2. Run ML Proposals
+    run_proposals()
     
     print("\n==============================================================")
-    print("Pipeline execution completed successfully!")
+    print("Report compilation phase completed successfully!")
     print("==============================================================")
 
 if __name__ == '__main__':
-    main()
+    run_reporting()
