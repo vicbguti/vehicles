@@ -12,6 +12,7 @@ env/
 
 # Large Data Files (Do not commit large datasets)
 data/raw/SRI_Vehiculos_Nuevos_*.csv
+*.bak
 data/raw/SRI_Vehiculos_DD.xlsx
 data/processed/
 data/features/
