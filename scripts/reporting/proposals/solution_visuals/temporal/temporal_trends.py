@@ -4,7 +4,10 @@ import yaml
 import pandas as pd
 import matplotlib.pyplot as plt
 from glob import glob
-from utils import parse_date, parse_slash_date
+# Ensure utils package is on path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../..')))
+from utils.date import parse_date, parse_slash_date
+from utils.time_series import trim_zero_tail
 
 def main():
     # Read config for paths
@@ -83,7 +86,7 @@ def main():
             })
             
     df_plot = pd.DataFrame(plot_data)
-    df_plot = df_plot.sort_values(['year', 'month']).reset_index(drop=True)
+    df_plot = trim_zero_tail(df_plot, date_col='date_label')
     
     # Plotting
     plt.figure(figsize=(12, 6))

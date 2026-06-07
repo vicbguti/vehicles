@@ -1,27 +1,43 @@
-def find_column(columns, candidates, exact=False):
-    """Return the first column name that matches any of the candidate strings.
+import unicodedata
 
-    Parameters
-    ----------
-    columns : list[str]
-        List of column names from the CSV header.
-    candidates : list[str]
-        Possible substrings (case‑insensitive) for the desired column.
-    exact : bool, optional
-        If True, require exact equality (c.strip().upper() == opt.upper()).
-        If False (default), match if the candidate appears anywhere in the column name.
-
-    Returns
-    -------
-    str | None
-        The matching column name, or None if no match is found.
+def _normalize(s: str) -> str:
+    """Strip accents, spaces, underscores and convert to upper‑case.
+    Handles Spanish accented characters such as "CANTÓN".
     """
-    for opt in candidates:
-        for c in columns:
-            if exact:
+    s = ''.join(
+        c for c in unicodedata.normalize('NFD', s)
+        if unicodedata.category(c) != 'Mn'
+    )
+    return s.replace(' ', '').replace('_', '').upper()
+def locate_column(columns: list[str], candidates: list[str], fallback_to_canton: bool = False) -> str | None:
+    """Return the first column matching any of *candidates*.
+    * Normalises both column names and candidates.
+    * If *fallback_to_canton* is True and no match is found, returns the first column
+      containing the token "CANTON" after normalisation.
+    """
+    norm_candidates = [_normalize(c) for c in candidates]
+    for col in columns:
+        col_norm = _normalize(col)
+        for cand in norm_candidates:
+            if cand in col_norm:
+                return col
+    if fallback_to_canton:
+        for col in columns:
+            if 'CANTON' in _normalize(col):
+                return col
+    return None
+
+
+# Backwards‑compatible wrapper – older code used ``find_column``
+def find_column(columns, candidates, exact=False):
+    """Legacy API retained for compatibility.
+    If *exact* is True, perform an exact upper‑case match; otherwise behave like
+    ``locate_column`` without the canton fallback.
+    """
+    if exact:
+        for opt in candidates:
+            for c in columns:
                 if c.strip().upper() == opt.upper():
                     return c
-            else:
-                if opt.upper() in c.strip().upper():
-                    return c
-    return None
+    else:
+        return locate_column(columns, candidates)

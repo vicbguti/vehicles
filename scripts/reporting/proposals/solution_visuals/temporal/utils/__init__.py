@@ -1,1 +1,4 @@
-from .date_parser import parse_date, parse_slash_date
+# -*- coding: utf-8 -*-
+"""Utilities package for temporal visualisation.
+This file makes the directory a Python package.
+"""

@@ -1,4 +1,4 @@
-from .constants import SPANISH_MONTHS
+from ..constants import SPANISH_MONTHS
 
 
 def parse_date(val):

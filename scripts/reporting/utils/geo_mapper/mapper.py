@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from .excel_dictionary import read_canton_sheet
+from ..excel_dictionary import read_canton_sheet
 
 # ----------------------------------------------------------------------
 # Global caches (populated once at import time)
@@ -8,8 +8,10 @@ from .excel_dictionary import read_canton_sheet
 _CANTON_MAP: dict[str, str] = {}
 _CANTON_TO_PROV_MAP: dict[str, str] = {}
 
+
 def _load_maps() -> None:
     """Populate the lookup dictionaries from the canton data sheet.
+
     This runs once when the module is imported, ensuring fast look‑ups.
     """
     df = read_canton_sheet()
@@ -25,14 +27,18 @@ def _load_maps() -> None:
 # Load caches at import time
 _load_maps()
 
+
 def code_to_name(canton_code: str) -> str | None:
     """Return the human‑readable canton name for a given canton code.
+
     Returns ``None`` if the code is not present in the dictionary.
     """
     return _CANTON_MAP.get(str(canton_code).strip())
 
+
 def code_to_province(canton_code: str) -> str | None:
     """Return the province name that the canton belongs to.
+
     The original code base expected a ``code_to_province`` function that
     accepted a *canton* code, so we keep the name for backward compatibility.
     """

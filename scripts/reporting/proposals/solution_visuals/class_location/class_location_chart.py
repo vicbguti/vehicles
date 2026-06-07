@@ -45,13 +45,16 @@ def main():
         )
         counts = df.groupby([class_col, loc_col]).size()
         for (cl, loc), cnt in counts.items():
-            key = (str(cl).strip().upper(), str(loc).strip().upper())
+            loc_str = str(loc).strip().upper()
+            if loc_str.isdigit():
+                continue
+            key = (str(cl).strip().upper(), loc_str)
             agg[key] = agg.get(key, 0) + cnt
 
         out_path = os.path.join(figures_dir, 'class_location_province_matrix.png')
 
     if not agg:
-        print('No data aggregated – nothing to plot.')
+        print('No hay datos agregados – nada que plotear.')
         return
 
     classes = sorted({k[0] for k in agg.keys()})
@@ -60,16 +63,28 @@ def main():
     for (cl, loc), cnt in agg.items():
         data.at[cl, loc] = cnt
 
-    plt.figure(figsize=(12, 8))
-    sns.heatmap(data, cmap='viridis', linewidths=0.5, annot=False)
-    plt.title('Vehicle Registrations – Class vs. Location (2017‑2026)', fontsize=14, fontweight='bold')
-    plt.xlabel('Location')
-    plt.ylabel('Vehicle Class')
+    from matplotlib.colors import LogNorm
+    import matplotlib.ticker as ticker
+    plt.figure(figsize=(14, 8))
+    # Using LogNorm with vmin=1 so that 0 counts map below the scale, and we color them as the lowest value or mask them.
+    # LogNorm shows log-scale colorbar but the actual counts are labeled on it.
+    sns.heatmap(
+        data, 
+        norm=LogNorm(vmin=1, vmax=data.max().max()), 
+        cmap='viridis', 
+        linewidths=0.5, 
+        annot=False,
+        cbar_kws={'label': 'Recuento de Registros (k)', 'format': ticker.FuncFormatter(lambda x, _: f"{int(x/1000)}k")}
+    )
+    plt.title('Registros de Vehículos – Clase vs. Provincia (2017‑2026)', fontsize=14, fontweight='bold')
+    plt.xlabel('Provincia')
+    plt.ylabel('Clase de Vehículo')
+    plt.xticks(rotation=45, ha='right')
     plt.tight_layout()
 
     plt.savefig(out_path, dpi=150)
     plt.close()
-    print(f"Class‑Location matrix chart saved to {out_path}")
+    print(f"Matriz de Clase‑Provincia guardada en {out_path}")
 
 if __name__ == '__main__':
     main()
