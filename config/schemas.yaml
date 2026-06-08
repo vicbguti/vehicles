@@ -1,0 +1,21 @@
+# Declarative schemas for raw and processed datasets
+
+raw_schema:
+  columns:
+    # Expected columns and types will be defined here after the initial data profile.
+    # Example:
+    #   PLACA:
+    #     type: "string"
+    #     nullable: false
+    #   ANIO:
+    #     type: "int"
+    #     nullable: false
+
+validation_rules:
+  # Business validation boundaries
+  engine_displacement_cc:
+    min: 0
+    max: 20000
+  year_manufacture:
+    min: 1900
+    max: 2027
