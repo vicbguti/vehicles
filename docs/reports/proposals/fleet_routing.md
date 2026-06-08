@@ -7,6 +7,7 @@ Documents and specifications for the Capacitated Vehicle Routing Problem (CVRP) 
 * **`reports/03_proposals/fleet_routing/specifications/`**: Technical routing and graph neural network specifications.
 * **`reports/03_proposals/fleet_routing/example/`**: Real scenario comparisons (Status quo vs. Optimal routing).
 
+* **Learning‑Based Approaches** – See the companion document **[learning_algorithms.md](learning_algorithms.md)**
 ## Solution & Variables Visualizations (`reports/03_proposals/fleet_routing/solution/`)
 * **`objective.md`**: Optimization math objectives.
 * **`data_features.md`**: Normalization and administrative filters list.
