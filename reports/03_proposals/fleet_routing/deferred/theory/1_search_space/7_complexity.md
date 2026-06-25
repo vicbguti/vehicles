@@ -43,3 +43,12 @@ Depending on the partition scheme chosen, the search space size ranges:
   $$15 \times 5,544 \times 1,625,702,400 = \mathbf{135,193,411,584,000} \text{ (135.2 Trillion Combinations)}$$
 * **For Asymmetric Partitions**:
   $$15 \times 440 \times 1,828,915,200 = \mathbf{12,070,840,320,000} \text{ (12.07 Trillion Combinations)}$$
+
+## C. Grouping-only timing (no routing)
+
+If we ignore routing and evaluate only the grouping (bin-packing) configurations, the search space is the **89,760** grouping configurations computed above. Example runtimes:
+
+- At **1 million evaluations/second**: $$\frac{89,760}{10^{6}} \approx \mathbf{0.09\ \text{seconds}}.$$\
+- At **1 trillion evaluations/second**: $$\frac{89,760}{10^{12}} \approx \mathbf{90\ \text{nanoseconds}}.$$
+
+This demonstrates that for the toy N=16/available=18 case the bin-packing enumeration alone is trivial to exhaust, which matches the discussion in [06_feasibility.md](../../../reports/03_proposals/fleet_routing/06_feasibility.md) about small-N tractability and why routing is the dominant contributor to intractability.

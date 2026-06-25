@@ -5,7 +5,7 @@ This document provides the mathematical proof showing why the routing paths for 
 ---
 
 ## 1. Prerequisites (Fixed Assignment)
-As mathematically proven in the bin-packing analysis in [bin_packing.md](../../problem/1_theory/1_search_space/bin_packing.md), the only feasible partition to deliver 15 vehicles on 2 trucks is:
+As mathematically proven in the bin-packing analysis in [bin_packing.md](./theory/2_generalization/3_partitioning/bin_packing.md), the only feasible partition to deliver 15 vehicles on 2 trucks is:
 * **Truck 1**: 6 SUVs (Assigned to Cuenca and Ambato)
 * **Truck 2**: 9 Sedans (Assigned to Machala, Santo Domingo, and Quito)
 

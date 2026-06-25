@@ -1,5 +1,7 @@
 # Pointer Network & Sequential Route Construction
 
+> **Deferred:** Route construction is out of scope. Active plan: [../README.md](../README.md).
+
 This document details the machine learning mechanics used to construct routing sequences dynamically and step-by-step.
 
 ---

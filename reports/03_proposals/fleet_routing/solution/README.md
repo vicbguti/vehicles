@@ -1,9 +1,5 @@
-# Machine Learning Solution
+# Charts
 
-This directory contains details of the machine learning solution design, optimization objectives, feature selections, and concrete data mapping walkthroughs.
+Generated visuals for demand analysis. Linked from [03_data.md](../03_data.md).
 
-## 📂 Documents
-
-* [objective.md](./objective.md) — CVRP optimization objective and target schedules.
-* [data_features.md](./data_features.md) — Input features, CUs, coordinate mapping, and discarded metadata.
-* [mapping_walkthrough.md](./mapping_walkthrough.md) — Concrete raw record mapping example showing ingested vs. ignored columns.
+See [visuals/README.md](./visuals/README.md) for the full list.

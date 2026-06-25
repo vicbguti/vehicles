@@ -1,6 +1,6 @@
-# Machine Learning Proposals Documentation
+# Machine Learning Proposals
 
-This directory details the design and architectures of the formulated algorithmic systems:
+* **[Fleet Loading](fleet_routing.md)** — capacitated fleet loading (active project)
+* **[Semantic Matching](semantic_matching.md)** — entity resolution for vehicle strings
 
-* **[Fleet Routing](file:///home/vicbguti/Projects/vehicles/docs/reports/proposals/fleet_routing.md)**: CVRP optimization model, specifications, and solution variables visualizations.
-* **[Semantic Matching](file:///home/vicbguti/Projects/vehicles/docs/reports/proposals/semantic_matching.md)**: Sentence-Transformer models for brand and country deduplication.
+Fleet loading docs live in `reports/03_proposals/fleet_routing/` — start at [README.md](../../../reports/03_proposals/fleet_routing/README.md).
