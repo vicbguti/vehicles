@@ -1,18 +1,16 @@
-# Fleet Routing Optimization Proposal
+# Fleet Loading Proposal
 
-Documents and specifications for the Capacitated Vehicle Routing Problem (CVRP) solver:
+Entry point: **[reports/03_proposals/fleet_routing/README.md](../../../reports/03_proposals/fleet_routing/README.md)**
 
-## Proposal Content
-* **`reports/03_proposals/fleet_routing/problem.md`**: Outlines model constraints and $N=16$ size limits.
-* **`reports/03_proposals/fleet_routing/specifications/`**: Technical routing and graph neural network specifications.
-* **`reports/03_proposals/fleet_routing/example/`**: Real scenario comparisons (Status quo vs. Optimal routing).
+| Doc | Topic |
+|-----|-------|
+| [01_problem.md](../../../reports/03_proposals/fleet_routing/01_problem.md) | Problem and CU constraints |
+| [02_scope.md](../../../reports/03_proposals/fleet_routing/02_scope.md) | Scope and decisions |
+| [03_data.md](../../../reports/03_proposals/fleet_routing/03_data.md) | SRI → training episodes |
+| [04_method.md](../../../reports/03_proposals/fleet_routing/04_method.md) | Labeler, model, baselines |
+| [05_evaluation.md](../../../reports/03_proposals/fleet_routing/05_evaluation.md) | Metrics and case study |
+| [06_feasibility.md](../../../reports/03_proposals/fleet_routing/06_feasibility.md) | Episode size study (`scripts/loading/episode_feasibility.py`) |
 
-* **Learning‑Based Approaches** – See the companion document **[learning_algorithms.md](learning_algorithms.md)**
-## Solution & Variables Visualizations (`reports/03_proposals/fleet_routing/solution/`)
-* **`objective.md`**: Optimization math objectives.
-* **`data_features.md`**: Normalization and administrative filters list.
-* **`mapping_walkthrough.md`**: Episodic scenario creation.
-* **`visuals/`**: Topic-specific charts:
-  * `class_distribution.png`: Bar chart mapping capacity targets.
-  * `geographic_demands.png`: Bubble map detailing spatial destination clusters.
-  * `temporal_trends.png`: Line plot showcasing demand seasonality.
+Charts: [solution/visuals/](../../../reports/03_proposals/fleet_routing/solution/visuals/)
+
+Archive: [deferred/](../../../reports/03_proposals/fleet_routing/deferred/)

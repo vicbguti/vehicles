@@ -1,11 +1,12 @@
-# Fleet Routing Examples
+# Toy Scenario Case Study
 
-This directory contains concrete examples, complexity breakdowns, and validation frameworks for the Fleet Routing and Vehicle Distribution system.
+18-vehicle daily dispatch example used in [05_evaluation.md](../05_evaluation.md).
 
-To explore the documentation, please refer to the localized indexes:
+* [problem/scenario.md](./problem/scenario.md) — Setup (5 cantons, 2 trucks)
+* [problem/constraints.md](./problem/constraints.md) — CU rules
+* [solution/comparisons.md](./solution/comparisons.md) — Status quo vs greedy vs optimal
+* [solution/4_optimized/optimized.md](./solution/4_optimized/optimized.md) — Optimal loading detail
 
-## 📂 [Problem Definition](./problem/README.md)
-Contains the scenario description, physical fleet capacity constraints, mathematical complexity theory, and sub-optimal baseline case studies.
+Baselines: [status_quo](./problem/3_status_quo/status_quo.md) · [greedy](./problem/2_greedy/greedy.md)
 
-## 📂 [Solution Design](./solution/README.md)
-Contains the globally optimized routing case study, mathematical proof of optimality, simulator training loop, validation metrics, and runtime execution details.
+Theory and routing proofs: [deferred/](../deferred/).
