@@ -1,6 +1,8 @@
 # Concrete Examples of the Combinations
 
-Here is a structured comparison of the three outcomes, separating the vehicle grouping, capacity utilization, route sequence, and total costs into distinct columns. Click on each case to see the detailed load calculations and routing paths:
+Here is a structured comparison of the three outcomes, separating the vehicle grouping, capacity utilization, route sequence (illustrative only), and total costs into distinct columns. Click on each case to see the detailed load calculations and routing paths:
+
+> Route sequence and distances are shown for context only. The project evaluation focuses on grouping, CU load, and leftovers.
 
 | Case / Scenario | Truck | Grouping (Vehicles) | Capacity Load (CUs) | Route Sequence | Distance (km) | Leftovers | Total Cost |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
