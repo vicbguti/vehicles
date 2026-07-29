@@ -1,0 +1,39 @@
+site_name: Fleet Loading
+site_description: Supervised imitation learning for capacitated fleet loading
+repo_url: https://github.com/anomalyco/vehicles
+theme:
+  name: material
+  palette:
+    primary: indigo
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.indexes
+    - toc.follow
+
+nav:
+  - Home: index.md
+  - Problem:
+    - Overview: proposals/01_problem.md
+    - Scope: proposals/02_scope.md
+  - Data:
+    - Description: proposals/03_data.md
+    - Feature coverage: proposals/08_feature_coverage.md
+    - Scenarios coverage: proposals/09_scenarios_coverage.md
+  - Method:
+    - Approach: proposals/04_method.md
+    - Feasibility: proposals/06_feasibility.md
+  - Evaluation: proposals/05_evaluation.md
+  - Kedro pipeline: kedro.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/anomalyco/vehicles
+
+markdown_extensions:
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.tabbed
+  - admonition
+  - footnotes
