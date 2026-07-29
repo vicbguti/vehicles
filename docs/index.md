@@ -21,6 +21,9 @@ kedro run
 
 # Start MLflow UI
 mlflow ui
+
+# View documentation (from project root)
+cd ~/Projects/vehicles && source fleet_loading/.venv/bin/activate && mkdocs serve
 ```
 
 ## Project structure
