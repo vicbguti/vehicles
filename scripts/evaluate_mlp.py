@@ -246,6 +246,21 @@ def main() -> None:
 
     latency = measure_latency(model, episodes["test"], arrays["test"], best_policy)
 
+    # --- 3. Ablación: ¿aporta el MLP, o basta el decodificador? ---------------
+    # Sustituye las puntuaciones por ceros y deja actuar sólo al decodificador,
+    # sobre los mismos episodios de prueba. Separa lo que aporta el modelo de lo
+    # que aporta la restricción de capacidad. Ver docs/tarea4/03_resultados_mlp.md.
+    ablation = aggregate(
+        evaluate_model(
+            episodes["test"],
+            arrays["test"],
+            np.zeros_like(logits["test"]),
+            best_policy,
+            n_classes,
+        ),
+        n_labels,
+    )
+
     plot_confusion(
         model_metrics["test"]["confusion_matrix"], labels, args.model_dir / "confusion_matrix.png"
     )
@@ -260,13 +275,14 @@ def main() -> None:
         "labels": labels,
         "model": model_metrics,
         "baseline_greedy": greedy_metrics,
+        "ablation_null_logits": {"test": _slim(ablation)},
         "inference_latency_per_manifest": latency,
     }
     (args.model_dir / "metrics.json").write_text(
         json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
-    # --- 3. Salida legible. --------------------------------------------------
+    # --- 4. Salida legible. --------------------------------------------------
     for name in ("val", "test"):
         m, g = model_metrics[name], greedy_metrics[name]
         print(
@@ -320,6 +336,26 @@ def main() -> None:
         f"\n  6. Latencia por manifiesto: media {latency['mean_ms']:.2f} ms, "
         f"p99 {latency['p99_ms']:.2f} ms"
     )
+
+    mt = model_metrics["test"]
+    print("\n=== ABLACIÓN sobre prueba: logits nulos, sólo el decodificador")
+    print(
+        f"  Brecha de conteo        modelo {mt['loaded_gap_mean']:+.4f}   "
+        f"sin modelo {ablation['loaded_gap_mean']:+.4f}"
+    )
+    print(
+        f"  Iguala el óptimo        modelo {mt['episodes_matching_teacher_count_pct']:.2f}%  "
+        f"sin modelo {ablation['episodes_matching_teacher_count_pct']:.2f}%"
+    )
+    print(
+        f"  Brecha de CU            modelo {mt['cu_gap_mean']:+.4f}   "
+        f"sin modelo {ablation['cu_gap_mean']:+.4f}"
+    )
+    print(
+        f"  Concordancia por clase  modelo {mt['class_level_agreement_mean']:.4f}   "
+        f"sin modelo {ablation['class_level_agreement_mean']:.4f}"
+    )
+
     print(f"\nMétricas en {args.model_dir / 'metrics.json'}")
 
 
