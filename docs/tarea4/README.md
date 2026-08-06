@@ -30,53 +30,63 @@ Titulares:
 - El plan entregado **nunca excede la capacidad** de un camión, en ninguno de los 34.839
   episodios.
 - Sobre el objetivo primario —cuántos vehículos se transportan— el modelo **iguala la
-  solución óptima en el 97,78 %** de los episodios de prueba, frente al 87,98 % de la
-  heurística greedy.
+  solución óptima en el 97,58 %** de los episodios de prueba, frente al 87,98 % de la
+  heurística greedy, y reproduce el plan completo del etiquetador en el **76,75 %**.
 - La arquitectura de puntuación por par cumple el requisito de flota sin límite codificado:
   se verificó ejecutando **los mismos pesos sobre manifiestos de diez camiones**, sin
   reentrenar.
-- **La baja exactitud (0,53) es una propiedad del generador de datos, no del modelo — y es
-  recuperable.** El techo exacto sobre estas etiquetas es **0,9243** y el modelo alcanza el
-  58,8 % de él. La brecha se explica: el orden aleatorio de la flota cambia el *plan* del
-  etiquetador y no es una entrada observable. Fijando ese orden, el mismo modelo llega a
-  **0,8458** de exactitud y **0,8131** de F1 macro sin mover las métricas operativas.
-  Sólo unos 8 puntos son ruido irreducible.
+- **La causa de la baja exactitud se encontró, se midió y se corrigió.** El generador
+  devolvía las capacidades de la flota en orden aleatorio, lo que fijaba cuál de los planes
+  óptimos empatados producía el etiquetador — información ausente de las entradas del modelo
+  y por tanto imposible de aprender. Ordenar la flota antes de etiquetar (una línea en
+  `src/loading/scenarios.py`) lleva al mismo modelo, con los mismos hiper-parámetros y la
+  misma semilla, de **0,5297 a 0,8458** de exactitud y de **0,2996 a 0,8131** de F1 macro,
+  **sin mover las métricas operativas**. El modelo pasa de alcanzar el 58,8 % de su techo
+  exacto a alcanzar el **97,7 %**.
 
-Limitaciones declaradas, no ocultadas: el modelo **no aporta a la elección de camión**
-(demostrado por ablación), pierde frente al greedy en aprovechamiento de CU, y la
-generalización a flotas grandes está demostrada como factibilidad, no como calidad.
+Limitaciones declaradas, no ocultadas: el modelo **pierde frente al greedy en aprovechamiento
+de CU** (+0,0760 contra +0,0007), `SIN CAMIÓN` es la etiqueta peor resuelta (64,7 % de
+cobertura), y la generalización a flotas grandes está demostrada como factibilidad, no como
+calidad — en el único conjunto de extrapolación exigente el greedy queda ligeramente por
+delante.
 
-> **Corrección del 27 de julio.** Una versión anterior de este resumen concluía que "cerca
-> del 60 % de la etiqueta es ruido irreducible", apoyándose en la auto-concordancia del
-> etiquetador (0,3983). Esa cifra nunca fue un techo. Calculado el techo real, la mayor
-> parte de esa brecha resultó **eliminable**, no irreducible. El análisis completo está en
-> [`06_canonicalizacion_y_etiquetado.md`](06_canonicalizacion_y_etiquetado.md).
+> **Correcciones registradas.**
+> **27 de julio.** Una versión anterior de este resumen concluía que "cerca del 60 % de la
+> etiqueta es ruido irreducible", apoyándose en la auto-concordancia del etiquetador
+> (0,3983). Esa cifra nunca fue un techo. Calculado el techo real, la mayor parte de esa
+> brecha resultó **eliminable**, no irreducible.
+> **6 de agosto.** El equipo acordó aplicar la corrección y el conjunto se regeneró. Con ello
+> cae una conclusión anterior: se afirmaba que el modelo **no aportaba a la elección de
+> camión**, apoyándose en una ablación donde la concordancia por clase era 0,5507 con modelo
+> y 0,5469 sin él. Sobre el conjunto corregido esa misma ablación da **0,9293 contra
+> 0,3092**: el modelo sí aporta, y mucho. No era que no supiera elegir camión — era que sobre
+> aquellas etiquetas no había nada aprendible que elegir. Detalle en
+> [`06_canonicalizacion_y_etiquetado.md`](06_canonicalizacion_y_etiquetado.md) y cifras
+> vigentes en [`03_resultados_mlp.md`](03_resultados_mlp.md).
 
 ---
 
 ## Reproducir
 
 ```bash
-git lfs pull                                        # 522 MB de datos reales
+git lfs install && git lfs pull                     # 522 MB de datos reales -- ver docs/git_lfs.md
 uv venv --python 3.12 && uv sync                    # Keras 3.15 + TensorFlow 2.21
 uv run python scripts/build_vehicle_features.py     # ~1 min
 uv run python scripts/build_scenarios.py            # ~7 min
-uv run python scripts/train_mlp.py                  # ~3 min en CPU
-uv run python scripts/evaluate_mlp.py
+uv run python scripts/train_mlp.py                  # ~2 min en CPU
+uv run python scripts/evaluate_mlp.py               # incluye la ablación de logits nulos
 uv run python scripts/teacher_self_agreement.py --years 2026
 uv run python scripts/label_ceiling.py              # techo exacto de exactitud
+uv run python scripts/sweep_mlp.py                  # 8 configuraciones, ~25 min
 uv run pytest tests/modeling                        # 88 pruebas
 ```
 
-Experimento del orden de la flota (§6 del documento 06), sin tocar `data/episodes/`:
-
-```bash
-uv run python artifacts/mlp/fleet_order_experiment/build_sorted_episodes.py \
-    --order asc --out /tmp/episodes_asc              # ~8 min
-uv run python scripts/train_mlp.py    --episodes-dir /tmp/episodes_asc --out-dir /tmp/mlp_asc
-uv run python scripts/evaluate_mlp.py --model-dir /tmp/mlp_asc --episodes-dir /tmp/episodes_asc
-uv run python scripts/teacher_self_agreement.py --years 2026 --fleet-order asc
-```
+> El experimento del orden de la flota
+> (`artifacts/mlp/fleet_order_experiment/build_sorted_episodes.py`) ya **no hace falta para
+> reproducir estos resultados**: era el modo de medir el efecto sin tocar `data/episodes/`,
+> y el arreglo que proponía está aplicado en `generate_fleet()`. Se conserva como evidencia
+> del §6 del documento 06 y para poder reconstruir el conjunto *anterior* si hiciera falta
+> comparar, con `--order as-is`.
 
 > **Nota de entorno.** El intérprete del sistema es Python 3.14 y TensorFlow 2.21 sólo
 > publica ruedas hasta CPython 3.13. Sin el `--python 3.12` el entorno no puede instalar
@@ -93,8 +103,10 @@ uv run python scripts/evaluate_mlp.py --split single --policy model \
 
 ## Código añadido
 
-Todo es **aditivo**: no se modificó `src/loading/labeler.py`, `src/loading/scenarios.py`
-ni `scripts/build_scenarios.py`, para no bloquear el trabajo de Víctor y Nicolás.
+Casi todo es **aditivo**: no se modificó `src/loading/labeler.py` ni
+`scripts/build_scenarios.py`. La única excepción es deliberada y acordada con el equipo:
+`generate_fleet()` en `src/loading/scenarios.py` ahora ordena las capacidades antes de
+etiquetar. Ese cambio obliga a **regenerar el conjunto y reentrenar los cinco modelos**.
 
 ```
 config/mlp.yaml

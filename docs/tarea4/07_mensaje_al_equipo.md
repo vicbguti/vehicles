@@ -3,6 +3,10 @@
 > Versión corta para enviar por chat. El detalle está en
 > [`06_canonicalizacion_y_etiquetado.md`](06_canonicalizacion_y_etiquetado.md).
 
+> **Nota del 6 de agosto.** Este mensaje se envió el 27 de julio y la decisión que planteaba
+> ya se tomó: se aplicó el parche. Se conserva como registro. Las cifras vigentes están en
+> [`03_resultados_mlp.md`](03_resultados_mlp.md).
+
 ---
 
 Encontré la causa del problema del etiquetador y la medí. Hay **una decisión que tomar hoy**.

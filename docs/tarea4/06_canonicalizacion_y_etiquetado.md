@@ -8,6 +8,24 @@
 > Complementa y **corrige en un punto importante** a
 > [`05_hallazgos_para_el_equipo.md`](05_hallazgos_para_el_equipo.md).
 
+> ### Nota del 6 de agosto — la decisión se tomó: la opción B está aplicada
+>
+> El equipo acordó aplicar el parche. `generate_fleet()` ya ordena la flota
+> (`src/loading/scenarios.py`), el conjunto de datos está regenerado y el MLP reentrenado.
+> **Las cifras de este documento son las de la medición del 27 de julio y se conservan tal
+> cual**, porque son el razonamiento que llevó a la decisión y el anexo de IA las referencia.
+>
+> Las cifras vigentes están en
+> [`03_resultados_mlp.md`](03_resultados_mlp.md), medidas ya sobre el dataset ordenado. Dos
+> diferencias que conviene conocer al leer lo que sigue:
+>
+> - Lo predicho se cumplió con exactitud: 0,8458 de exactitud cruda, 0,8131 de F1 macro y
+>   0,9293 de concordancia por clase, idénticos a los de la tabla de abajo.
+> - **El techo cambió**, porque el dataset cambió. Ordenar la flota equilibra el reparto de
+>   etiquetas, y un problema más equilibrado es más difícil para un clasificador
+>   determinista: la cota A sobre prueba 2026 pasó de 0,9243 a **0,8997** y la cota B de
+>   0,9005 a **0,8659**. El modelo alcanza ahora el **97,7 %** de la cota B, no el 58,8 %.
+
 ---
 
 ## 0. Resumen en diez líneas

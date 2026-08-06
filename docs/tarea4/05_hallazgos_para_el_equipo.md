@@ -91,6 +91,9 @@ mientras que el resultado operativo es 100 % determinista.
    comparables los modelos. El salto grande es el punto 3.
 3. **Decidir en grupo si ordenamos la flota en `scenarios.py`.** Cuesta 8 minutos de
    regeneración y obliga a reentrenar los cinco modelos. No lo apliqué solo.
+   → **Resuelto el 6 de agosto: el grupo lo acordó y está aplicado.** El conjunto está
+   regenerado y el MLP reentrenado; faltan los otros cuatro modelos. Cifras vigentes en
+   [`03_resultados_mlp.md`](03_resultados_mlp.md).
 
 ---
 

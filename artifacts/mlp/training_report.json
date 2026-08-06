@@ -1,6 +1,6 @@
 {
-  "generated": "2026-07-25 22:39 UTC",
-  "episodes_dir": "/home/jfcofer/Documents/jfco/espol/2026_1/ia/2p/tasks/task 4/repo/data/episodes",
+  "generated": "2026-08-06 13:38 UTC",
+  "episodes_dir": "/home/jfcofer/Documents/jfco/espol/2026_1/ia/proyecto/dev/project-repo/data/episodes",
   "split_strategy": "time",
   "episodes_dropped_non_optimal": 0,
   "splits": [
@@ -44,24 +44,24 @@
   "canonical_label_counts": {
     "train": {
       "0": 18903,
-      "1": 232175,
-      "2": 112478,
-      "3": 58424,
-      "4": 22071
+      "1": 137974,
+      "2": 114570,
+      "3": 102288,
+      "4": 70316
     },
     "val": {
       "0": 2750,
-      "1": 35244,
-      "2": 16705,
-      "3": 8368,
-      "4": 3332
+      "1": 20164,
+      "2": 17653,
+      "3": 15237,
+      "4": 10595
     },
     "test": {
       "0": 1000,
-      "1": 12706,
-      "2": 6204,
-      "3": 2999,
-      "4": 1321
+      "1": 7247,
+      "2": 6458,
+      "3": 5405,
+      "4": 4120
     }
   },
   "deferred_weight": 11.745516777038574,
@@ -86,10 +86,24 @@
     "reduce_lr_factor": 0.5,
     "seed": 20260725
   },
-  "epochs_run": 56,
-  "best_epoch_zero_based": 45,
-  "best_val_loss": 0.9236994385719299,
-  "best_val_raw_accuracy": 0.5252187252044678,
-  "training_seconds": 150.5,
+  "unweighted_loss": {
+    "train": {
+      "loss": 0.4939284026622772,
+      "raw_assignment_accuracy": 0.8145978450775146
+    },
+    "val": {
+      "loss": 0.47565165162086487,
+      "raw_assignment_accuracy": 0.8265636563301086
+    },
+    "test": {
+      "loss": 0.4322846829891205,
+      "raw_assignment_accuracy": 0.8497317433357239
+    }
+  },
+  "epochs_run": 51,
+  "best_epoch_zero_based": 40,
+  "best_val_loss": 0.47565150260925293,
+  "best_val_raw_accuracy": 0.8265636563301086,
+  "training_seconds": 123.0,
   "n_parameters": 4482
 }

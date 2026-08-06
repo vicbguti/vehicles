@@ -328,12 +328,16 @@ Se enuncian de forma explícita para no atribuir al diseño propiedades que no s
    verdaderamente irreducible vale unos 8 puntos. Por eso la exactitud se reporta como
    diagnóstico secundario y **siempre acompañada de su techo**.
 
-2. **El conjunto de datos hereda una arbitrariedad corregible que no se corrigió.** El
-   generador de escenarios sortea las capacidades sin ordenarlas, y eso determina cuál de
-   los planes óptimos empatados devuelve el etiquetador. Está medido lo que cuesta y lo que
-   se gana (sección 4 y `docs/tarea4/06_canonicalizacion_y_etiquetado.md`); no se aplicó
-   porque obliga a regenerar el conjunto y reentrenar los cinco modelos del grupo, decisión
-   que no corresponde a este entregable.
+2. **El conjunto de datos heredaba una arbitrariedad corregible, ya corregida.** El generador
+   de escenarios sorteaba las capacidades sin ordenarlas, y eso determinaba cuál de los planes
+   óptimos empatados devolvía el etiquetador — una información que no forma parte de las
+   entradas del modelo y que por tanto era imposible de aprender. Medido el coste y la
+   ganancia (sección 4 y `docs/tarea4/06_canonicalizacion_y_etiquetado.md`), el grupo acordó
+   ordenar la flota antes de etiquetar; el conjunto se regeneró y los modelos se reentrenaron.
+   La exactitud cruda pasó de 0,5297 a **0,8458** sin que las métricas operativas se movieran.
+   Queda como ruido irreducible el desempate aleatorio del etiquetador entre vehículos de la
+   misma clase, que **no** conviene eliminar: fijarlo por identificador introduciría un sesgo
+   sistemático de exclusión sobre los mismos vehículos.
 
 3. **La generalización a flotas mayores está demostrada como factibilidad, no como
    calidad.** Los datos de entrenamiento contienen entre uno y cuatro camiones. El modelo
