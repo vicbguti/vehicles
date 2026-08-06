@@ -1,3 +1,9 @@
+# Data pipeline and profiling only (scripts/run_pipeline.py, scripts/profiling/).
+#
+# This file does NOT cover the modeling stack. Keras and TensorFlow are declared
+# with pinned versions in pyproject.toml, which uv.lock resolves -- use
+# `uv venv --python 3.12 && uv sync` for anything under src/modeling/ or the
+# *_mlp.py scripts. TensorFlow publishes no wheels for CPython 3.14.
 pandas
 openpyxl
 pyyaml
