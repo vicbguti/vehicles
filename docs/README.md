@@ -4,6 +4,7 @@ Welcome to the technical documentation for the vehicles project. Use the links b
 
 ## 📂 Technical Layout Docs
 
+* [git_lfs.md](./git_lfs.md) — **Required setup.** The `data/clean/` CSVs are Git LFS objects.
 * [data_pipeline.md](./data_pipeline.md) — Raw, processed, and featured data directories.
 * [configuration.md](./configuration.md) — YAML configuration files and validation schemas.
 * [source_code.md](./source_code.md) — Reusable modules and python packages in `src/`.

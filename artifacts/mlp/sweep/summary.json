@@ -1,0 +1,142 @@
+{
+  "selection_metric": "val_loaded_gap_mean, luego val_cu_gap_mean",
+  "runs": [
+    {
+      "tag": "batch_512",
+      "overrides": [
+        "optimization.batch_size=512"
+      ],
+      "n_parameters": 4482,
+      "epochs_run": 55,
+      "decoder_policy": "model",
+      "val_loaded_gap_mean": 0.024069478908188585,
+      "val_cu_gap_mean": 0.07650124069478766,
+      "val_capacity_violation_rate": 0.0,
+      "val_class_level_agreement": 0.927129245007993,
+      "test_loaded_gap_mean": 0.023514043109079032,
+      "test_cu_gap_mean": 0.07393860222076927,
+      "test_episodes_matching_pct": 97.6485956890921,
+      "seconds": 149.4
+    },
+    {
+      "tag": "dropout_030",
+      "overrides": [
+        "model.dropout=0.30"
+      ],
+      "n_parameters": 4482,
+      "epochs_run": 58,
+      "decoder_policy": "model",
+      "val_loaded_gap_mean": 0.02555831265508685,
+      "val_cu_gap_mean": 0.081339950372207,
+      "val_capacity_violation_rate": 0.0,
+      "val_class_level_agreement": 0.9207670488503099,
+      "test_loaded_gap_mean": 0.024820378837361202,
+      "test_cu_gap_mean": 0.07798824297844398,
+      "test_episodes_matching_pct": 97.51796211626387,
+      "seconds": 187.9
+    },
+    {
+      "tag": "lr_3e-4",
+      "overrides": [
+        "optimization.learning_rate=0.0003"
+      ],
+      "n_parameters": 4482,
+      "epochs_run": 44,
+      "decoder_policy": "model",
+      "val_loaded_gap_mean": 0.025806451612903226,
+      "val_cu_gap_mean": 0.07997518610421692,
+      "val_capacity_violation_rate": 0.0,
+      "val_class_level_agreement": 0.9265719763254123,
+      "test_loaded_gap_mean": 0.02155453951665578,
+      "test_cu_gap_mean": 0.07439581972566801,
+      "test_episodes_matching_pct": 97.84454604833442,
+      "seconds": 164.5
+    },
+    {
+      "tag": "base_64_32",
+      "overrides": [],
+      "n_parameters": 4482,
+      "epochs_run": 51,
+      "decoder_policy": "model",
+      "val_loaded_gap_mean": 0.026550868486352356,
+      "val_cu_gap_mean": 0.079354838709676,
+      "val_capacity_violation_rate": 0.0,
+      "val_class_level_agreement": 0.9255061838978421,
+      "test_loaded_gap_mean": 0.024167210973220117,
+      "test_cu_gap_mean": 0.07596342259960662,
+      "test_episodes_matching_pct": 97.58327890267799,
+      "seconds": 171.1
+    },
+    {
+      "tag": "dropout_010",
+      "overrides": [
+        "model.dropout=0.10"
+      ],
+      "n_parameters": 4482,
+      "epochs_run": 53,
+      "decoder_policy": "model",
+      "val_loaded_gap_mean": 0.027047146401985113,
+      "val_cu_gap_mean": 0.07883374689826156,
+      "val_capacity_violation_rate": 0.0,
+      "val_class_level_agreement": 0.9231373355816772,
+      "test_loaded_gap_mean": 0.02612671456564337,
+      "test_cu_gap_mean": 0.07779229261920165,
+      "test_episodes_matching_pct": 97.45264532984977,
+      "seconds": 170.1
+    },
+    {
+      "tag": "lr_3e-3",
+      "overrides": [
+        "optimization.learning_rate=0.003"
+      ],
+      "n_parameters": 4482,
+      "epochs_run": 21,
+      "decoder_policy": "model",
+      "val_loaded_gap_mean": 0.027791563275434243,
+      "val_cu_gap_mean": 0.08101736972704572,
+      "val_capacity_violation_rate": 0.0,
+      "val_class_level_agreement": 0.9230947189736534,
+      "test_loaded_gap_mean": 0.026779882429784456,
+      "test_cu_gap_mean": 0.0751143043762232,
+      "test_episodes_matching_pct": 97.38732854343566,
+      "seconds": 101.7
+    },
+    {
+      "tag": "ancha_128_64_32",
+      "overrides": [
+        "model.pair_units=[128, 64, 32]",
+        "model.defer_units=[64, 32]"
+      ],
+      "n_parameters": 16130,
+      "epochs_run": 57,
+      "decoder_policy": "model",
+      "val_loaded_gap_mean": 0.02803970223325062,
+      "val_cu_gap_mean": 0.08168734491314993,
+      "val_capacity_violation_rate": 0.0,
+      "val_class_level_agreement": 0.9282202366124325,
+      "test_loaded_gap_mean": 0.024820378837361202,
+      "test_cu_gap_mean": 0.07798824297844399,
+      "test_episodes_matching_pct": 97.58327890267799,
+      "seconds": 280.2
+    },
+    {
+      "tag": "ancha_dropout_010",
+      "overrides": [
+        "model.pair_units=[128, 64, 32]",
+        "model.dropout=0.10",
+        "optimization.learning_rate=0.0003"
+      ],
+      "n_parameters": 14018,
+      "epochs_run": 57,
+      "decoder_policy": "model",
+      "val_loaded_gap_mean": 0.031265508684863524,
+      "val_cu_gap_mean": 0.08034739454094147,
+      "val_capacity_violation_rate": 0.0,
+      "val_class_level_agreement": 0.9265422716548559,
+      "test_loaded_gap_mean": 0.027433050293925537,
+      "test_cu_gap_mean": 0.07563683866753607,
+      "test_episodes_matching_pct": 97.32201175702156,
+      "seconds": 301.1
+    }
+  ]
+}

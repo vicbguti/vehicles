@@ -1,0 +1,40 @@
+#!/bin/sh
+# Reject commits that would store the SRI CSVs as raw blobs instead of Git LFS
+# pointers.
+#
+# This is not hypothetical: it already happened once and put 523 MB of CSV into
+# a branch. The cause is always the same -- `git lfs install` was never run in
+# the clone, so the `clean` filter does not exist and .gitattributes is inert.
+#
+# Install:  ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
+# See docs/git_lfs.md.
+
+staged=$(git diff --cached --name-only --diff-filter=AM -- 'data/clean/*.csv' 'data/raw/*.csv')
+[ -z "$staged" ] && exit 0
+
+fail=0
+for path in $staged; do
+    blob=$(git rev-parse ":$path" 2>/dev/null) || continue
+    if ! git cat-file blob "$blob" 2>/dev/null | head -n 1 |
+         grep -q '^version https://git-lfs\.github\.com/spec/v1$'; then
+        size=$(git cat-file -s "$blob" 2>/dev/null)
+        echo "error: $path is staged as a raw blob (${size} bytes), not an LFS pointer." >&2
+        fail=1
+    fi
+done
+
+if [ "$fail" -ne 0 ]; then
+    cat >&2 <<'MSG'
+
+Git LFS is not filtering these files. To fix:
+
+    git lfs install --local
+    git reset
+    git add <your files>
+
+Then commit again. See docs/git_lfs.md for the full explanation.
+MSG
+    exit 1
+fi
+
+exit 0

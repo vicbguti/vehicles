@@ -81,7 +81,14 @@ def stratified_subsample(group: pd.DataFrame, max_n: int, rng: random.Random) ->
 
 def generate_fleet(rng: random.Random) -> list[float]:
     n_trucks = rng.randint(*N_TRUCKS_RANGE)
-    return [round(rng.uniform(*CAP_RANGE), 1) for _ in range(n_trucks)]
+    caps = [round(rng.uniform(*CAP_RANGE), 1) for _ in range(n_trucks)]
+    # Sorted so that the truck index carries meaning. Unsorted, the DP in
+    # labeler.py fills index 0 first and index 0 has a random capacity, so
+    # "CAMION_1" names whichever truck the RNG happened to emit first -- a fact
+    # that is not among the model's inputs and therefore cannot be learned.
+    # Sorting consumes no randomness, so every other episode field is unchanged.
+    # See docs/tarea4/06_canonicalizacion_y_etiquetado.md sections 2 and 6.
+    return sorted(caps)
 
 
 @dataclass
