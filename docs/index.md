@@ -6,9 +6,9 @@ Supervised imitation learning for capacitated fleet loading — assign vehicles 
 
 | Model | Accuracy | Defer F1 | Type |
 |---|---|---|---|
-| **XGBoost** | 95.8% | 0.029 | Per-vehicle tree baseline |
+| **XGBoost** | 95.8% | 0.028 | Per-vehicle tree baseline |
 | **LightGBM** | 95.7% | 0.001 | Per-vehicle tree baseline |
-| **Transformer** | 81.2% | **0.662** | Set-based (attention over vehicles) |
+| **Transformer** | 78.7% | **0.658** | Set-based (attention over vehicles) |
 
 ## Quick start
 
@@ -20,7 +20,8 @@ source .venv/bin/activate
 kedro run
 
 # Start MLflow UI
-mlflow ui
+# MLflow runs are stored in fleet_loading/mlflow.db (SQLite)
+MLFLOW_TRACKING_URI=sqlite:///mlflow.db mlflow ui
 
 # View documentation (from project root)
 cd ~/Projects/vehicles && source fleet_loading/.venv/bin/activate && mkdocs serve
