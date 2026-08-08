@@ -25,6 +25,12 @@ nav:
     - Feasibility: proposals/06_feasibility.md
   - Evaluation: proposals/05_evaluation.md
   - Kedro pipeline: kedro.md
+  - Tarea 4 (MLP):
+    - Overview: tarea4/README.md
+    - Results: tarea4/03_resultados_mlp.md
+    - Label canonicalization: tarea4/06_canonicalizacion_y_etiquetado.md
+    - Findings for team: tarea4/05_hallazgos_para_el_equipo.md
+    - Model comparability: tarea4/08_comparabilidad_cinco_modelos.md
 
 extra:
   social:
