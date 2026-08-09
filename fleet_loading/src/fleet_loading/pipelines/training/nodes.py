@@ -9,10 +9,17 @@ mlflow.set_tracking_uri(f"sqlite:///{MLFLOW_DB}")
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
-from sklearn.metrics import f1_score, accuracy_score
+from sklearn.metrics import f1_score, accuracy_score, confusion_matrix
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OrdinalEncoder
+
+from fleet_loading.pipelines.training.operational import (
+    CONFUSION_LABELS,
+    aggregate_operational,
+    gbt_truck_plans,
+    greedy_report,
+)
 
 NUMERIC_FEATURES = [
     "cu",
@@ -32,11 +39,59 @@ NUMERIC_FEATURES = [
 ]
 CATEGORICAL_FEATURES = ["canton", "clase"]
 ALL_FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
-TARGET = "loaded"
+TARGET = "truck_label"  # 0..3 = CAMION_1..4, 4 = SIN_CAMION (defer)
+DEFER_LABEL = 4
+TRUCK_NAMES = ["CAMION_1", "CAMION_2", "CAMION_3", "CAMION_4"]
 
 
 def _compute_defer_f1(y_true, y_pred) -> float:
-    return f1_score(y_true, y_pred, pos_label=False, zero_division=0)
+    """F1 for the defer class (label 4) vs everything else."""
+    return f1_score(
+        (y_true == DEFER_LABEL).astype(int),
+        (y_pred == DEFER_LABEL).astype(int),
+        zero_division=0,
+    )
+
+
+def _log_gbt_curves(model, metric_name: str, error_metric: str, prefix: str) -> None:
+    """Re-log a GBT's train/val loss and accuracy curves under clear MLflow names.
+
+    Both XGBoost and LightGBM record per-round eval results in ``evals_result``
+    keyed as ``validation_0``/``validation_1`` (XGB) or ``training``/``valid_1``
+    (LGB). ``mlflow.autolog`` logs these under those framework names; we re-log
+    them as ``<prefix>_train_<metric>`` / ``<prefix>_val_<metric>`` so the MLflow
+    UI is unambiguous. Accuracy is logged as ``1 - error`` from the framework's
+    error metric.
+    """
+    result = getattr(model, "evals_result", None)
+    result = result() if callable(result) else getattr(model, "_evals_result", None)
+    if not result:
+        return
+    train_series = result.get("validation_0") or result.get("training")
+    val_series = (
+        result.get("validation_1")
+        or result.get("valid_1")
+        or result.get("valid_0")
+    )
+    for name, series in (("train", train_series), ("val", val_series)):
+        if not series:
+            continue
+        loss = series.get(metric_name) or next(iter(series.values()))
+        for step, v in enumerate(loss):
+            mlflow.log_metric(f"{prefix}_{name}_{metric_name}", v, step=step)
+        error = series.get(error_metric)
+        if error:
+            for step, v in enumerate(error):
+                mlflow.log_metric(f"{prefix}_{name}_accuracy_curve", 1.0 - v, step=step)
+
+
+def _encode_truck_label(truck: str, n_trucks: int) -> int:
+    """Map a truck name to a canonical label (0..3) or defer (4)."""
+    if truck == "SIN_CAMION":
+        return DEFER_LABEL
+    if truck in TRUCK_NAMES:
+        return TRUCK_NAMES.index(truck)
+    raise ValueError(f"Unknown truck: {truck!r} (n_trucks={n_trucks})")
 
 
 def _build_preprocessor() -> ColumnTransformer:
@@ -44,6 +99,124 @@ def _build_preprocessor() -> ColumnTransformer:
         ("num", "passthrough", NUMERIC_FEATURES),
         ("cat", OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1), CATEGORICAL_FEATURES),
     ])
+
+
+def _balanced_sample_weight(y: pd.Series) -> np.ndarray:
+    """Inverse-frequency per-class sample weights (multiclass class balancing)."""
+    counts = y.value_counts()
+    w = np.ones(len(y), dtype=float)
+    for label, c in counts.items():
+        w[y.values == label] = len(y) / (len(counts) * c)
+    return w
+
+
+def _operational_report(
+    predict_proba,  # callable(df) -> (n, n_trucks+1) multiclass probs
+    val_df: pd.DataFrame,
+    episodes: pd.DataFrame,
+) -> dict:
+    """Model plan vs greedy baseline vs exact teacher on the same episodes."""
+    model_rows, model_latency = gbt_truck_plans(
+        predict_proba, val_df, episodes, ALL_FEATURES
+    )
+    greedy_rows, greedy_latency = greedy_report(val_df, episodes)
+    return {
+        "model": aggregate_operational(model_rows, model_latency),
+        "greedy": aggregate_operational(greedy_rows, greedy_latency),
+    }
+
+
+def _log_operational(operational: dict, prefix: str) -> None:
+    """Log operational metrics to the active MLflow run."""
+    for agg in ("model", "greedy"):
+        for k, v in operational[agg].items():
+            if isinstance(v, dict):
+                for sub_k, sub_v in v.items():
+                    mlflow.log_metric(f"{prefix}_{agg}_{k}_{sub_k}", sub_v)
+            else:
+                mlflow.log_metric(f"{prefix}_{agg}_{k}", v)
+
+
+def _confusion_matrix_figure(
+    y_true, y_pred, title: str, normalized: bool = False
+) -> "matplotlib.figure.Figure":
+    """Render a 5-way confusion matrix figure (no MLflow side effects)."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from sklearn.metrics import ConfusionMatrixDisplay
+
+    labels = list(range(DEFER_LABEL + 1))
+    cm = confusion_matrix(
+        y_true, y_pred, labels=labels,
+        normalize="true" if normalized else None,
+    )
+    disp = ConfusionMatrixDisplay(cm, display_labels=CONFUSION_LABELS)
+    fig, ax = plt.subplots(figsize=(7, 6))
+    disp.plot(ax=ax, cmap="Blues", colorbar=False)
+    ax.set_title(title)
+    ax.set_xlabel("Predicción (truck asignado)")
+    ax.set_ylabel("Real (truck asignado)")
+    ax.tick_params(axis="x", rotation=45)
+    return fig
+
+
+def report_confusion_matrices(
+    xgb_predictions: pd.DataFrame,
+    lgb_predictions: pd.DataFrame,
+    att_predictions: pd.DataFrame,
+    xgb_results: dict = None,
+    lgb_results: dict = None,
+) -> dict:
+    """Render all confusion matrices from cached predictions. Pure function:
+    figures depend only on (y_true, y_pred), never on retraining. Also
+    overwrites MLflow's numeric confusion_matrix.png with a readable version."""
+    figs = {}
+    for split in ("train", "val"):
+        for prefix, preds in (("xgb", xgb_predictions), ("lgb", lgb_predictions)):
+            sub = preds[preds["split"] == split]
+            figs[f"{prefix}_confusion_matrix_{split}"] = _confusion_matrix_figure(
+                sub["y_true"], sub["y_pred"],
+                f"{prefix} confusion matrix ({split})",
+            )
+    figs["att_confusion_matrix_val"] = _confusion_matrix_figure(
+        att_predictions["y_true"], att_predictions["y_pred"],
+        "attention capacity-aware confusion matrix (val)",
+    )
+
+    # mlflow.evaluate's confusion_matrix.png needs numeric labels for the math;
+    # overwrite it with a readable normalized version in the same run.
+    for prefix, preds, results in (
+        ("xgb", xgb_predictions, xgb_results or {}),
+        ("lgb", lgb_predictions, lgb_results or {}),
+    ):
+        run_id = results.get("run_id")
+        if not run_id:
+            continue
+        val = preds[preds["split"] == "val"]
+        fig = _confusion_matrix_figure(
+            val["y_true"], val["y_pred"],
+            "Normalized confusion matrix",
+            normalized=True,
+        )
+        with mlflow.start_run(run_id=run_id):
+            mlflow.log_figure(fig, "confusion_matrix.png")
+
+    return figs
+
+
+def _evaluate_and_log(pipe, run_id: str, train_df, val_df, prefix: str) -> None:
+    """Run mlflow.evaluate on the val split (standard classifier suite)."""
+    val_eval = val_df.copy()
+    val_eval = val_eval[ALL_FEATURES + [TARGET]]
+    mlflow.models.evaluate(
+        model=f"runs:/{run_id}/model",
+        data=val_eval,
+        targets=TARGET,
+        model_type="classifier",
+        evaluators=["default"],
+    )
 
 
 def _greedy_pack_fits(
@@ -131,7 +304,10 @@ def encode_features(
         .astype(float)
     )
 
-    df["loaded"] = (df["truck"] != "SIN_CAMION").astype(int)
+    df["truck_label"] = df.apply(
+        lambda row: _encode_truck_label(row["truck"], row["n_trucks"]),
+        axis=1,
+    )
 
     return df.drop(columns=["truck_capacities"]).reset_index(drop=True)
 
@@ -159,6 +335,7 @@ def split_data(
 def train_xgboost(
     train_df: pd.DataFrame,
     val_df: pd.DataFrame,
+    episodes: pd.DataFrame,
     max_depth: int,
     learning_rate: float,
     n_estimators: int,
@@ -170,6 +347,7 @@ def train_xgboost(
     run_name: str,
 ) -> dict:
     import xgboost as xgb
+    import mlflow.xgboost
 
     params = {
         "max_depth": max_depth,
@@ -178,10 +356,10 @@ def train_xgboost(
         "subsample": subsample,
         "colsample_bytree": colsample_bytree,
         "min_child_weight": min_child_weight,
-        "scale_pos_weight": scale_pos_weight,
         "max_delta_step": max_delta_step,
-        "objective": "binary:logistic",
-        "eval_metric": "logloss",
+        "objective": "multi:softprob",
+        "num_class": DEFER_LABEL + 1,
+        "eval_metric": ["mlogloss", "merror"],
         "verbosity": 0,
     }
 
@@ -190,29 +368,41 @@ def train_xgboost(
     X_val_raw = val_df[ALL_FEATURES]
     y_val = val_df[TARGET]
 
+    sample_weight = _balanced_sample_weight(y_train)
+
     preprocessor = _build_preprocessor()
     X_train = preprocessor.fit_transform(X_train_raw)
     X_val = preprocessor.transform(X_val_raw)
 
     model = xgb.XGBClassifier(**params)
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_val, y_val)],
-        verbose=False,
-    )
+    with mlflow.start_run(run_name=run_name):
+        mlflow.xgboost.autolog(log_models=False, silent=True)
+        model.fit(
+            X_train, y_train,
+            eval_set=[(X_train, y_train), (X_val, y_val)],
+            sample_weight=sample_weight,
+            verbose=False,
+        )
+        run_id = mlflow.active_run().info.run_id
 
     pipe = Pipeline([
         ("preprocessor", preprocessor),
         ("classifier", model),
     ])
 
-    with mlflow.start_run(run_name=run_name):
+    with mlflow.start_run(run_id=run_id):
         mlflow.log_params({f"xgb_{k}": v for k, v in params.items()})
         mlflow.log_param("xgb_preprocessor", "OrdinalEncoder(canton, clase) + passthrough(num)")
+        _log_gbt_curves(model, "mlogloss", "merror", "xgb")
 
         y_pred = pipe.predict(X_val_raw)
         acc = accuracy_score(y_val, y_pred)
         f1 = _compute_defer_f1(y_val, y_pred)
+
+        operational = _operational_report(
+            pipe.predict_proba, val_df, episodes
+        )
+        _log_operational(operational, "xgb")
 
         mlflow.log_metric("xgb_val_accuracy", acc)
         mlflow.log_metric("xgb_val_defer_f1", f1)
@@ -220,16 +410,30 @@ def train_xgboost(
             pipe, "model",
             serialization_format="pickle",
         )
+        _evaluate_and_log(pipe, run_id, train_df, val_df, "xgb")
+
+        y_pred_train = pipe.predict(X_train_raw)
+        predictions = pd.DataFrame({
+            "y_true": np.concatenate([y_train, y_val]),
+            "y_pred": np.concatenate([y_pred_train, y_pred]),
+            "split": ["train"] * len(train_df) + ["val"] * len(val_df),
+        })
 
         return {
-            "xgb_val_accuracy": acc,
-            "xgb_val_defer_f1": f1,
+            "xgb_results": {
+                "xgb_val_accuracy": acc,
+                "xgb_val_defer_f1": f1,
+                "xgb_operational": operational,
+                "run_id": run_id,
+            },
+            "xgb_predictions": predictions,
         }
 
 
 def train_lightgbm(
     train_df: pd.DataFrame,
     val_df: pd.DataFrame,
+    episodes: pd.DataFrame,
     num_leaves: int,
     learning_rate: float,
     n_estimators: int,
@@ -240,6 +444,7 @@ def train_lightgbm(
     run_name: str,
 ) -> dict:
     import lightgbm as lgb
+    import mlflow.lightgbm
 
     params = {
         "num_leaves": num_leaves,
@@ -248,8 +453,8 @@ def train_lightgbm(
         "subsample": subsample,
         "colsample_bytree": colsample_bytree,
         "min_child_samples": min_child_samples,
-        "scale_pos_weight": scale_pos_weight,
-        "objective": "binary",
+        "objective": "multiclass",
+        "num_class": DEFER_LABEL + 1,
         "verbosity": -1,
     }
 
@@ -258,29 +463,42 @@ def train_lightgbm(
     X_val_raw = val_df[ALL_FEATURES]
     y_val = val_df[TARGET]
 
+    sample_weight = _balanced_sample_weight(y_train)
+
     preprocessor = _build_preprocessor()
     X_train = preprocessor.fit_transform(X_train_raw)
     X_val = preprocessor.transform(X_val_raw)
 
     model = lgb.LGBMClassifier(**params)
-    model.fit(
-        X_train, y_train,
-        eval_set=[(X_val, y_val)],
-        callbacks=[lgb.early_stopping(50)],
-    )
+    with mlflow.start_run(run_name=run_name):
+        mlflow.lightgbm.autolog(log_models=False, silent=True)
+        model.fit(
+            X_train, y_train,
+            eval_set=[(X_train, y_train), (X_val, y_val)],
+            eval_metric=["multi_logloss", "multi_error"],
+            sample_weight=sample_weight,
+            callbacks=[lgb.early_stopping(50)],
+        )
+        run_id = mlflow.active_run().info.run_id
 
     pipe = Pipeline([
         ("preprocessor", preprocessor),
         ("classifier", model),
     ])
 
-    with mlflow.start_run(run_name=run_name):
+    with mlflow.start_run(run_id=run_id):
         mlflow.log_params({f"lgb_{k}": v for k, v in params.items()})
         mlflow.log_param("lgb_preprocessor", "OrdinalEncoder(canton, clase) + passthrough(num)")
+        _log_gbt_curves(model, "multi_logloss", "multi_error", "lgb")
 
         y_pred = pipe.predict(X_val_raw)
         acc = accuracy_score(y_val, y_pred)
         f1 = _compute_defer_f1(y_val, y_pred)
+
+        operational = _operational_report(
+            pipe.predict_proba, val_df, episodes
+        )
+        _log_operational(operational, "lgb")
 
         mlflow.log_metric("lgb_val_accuracy", acc)
         mlflow.log_metric("lgb_val_defer_f1", f1)
@@ -288,10 +506,23 @@ def train_lightgbm(
             pipe, "model",
             serialization_format="pickle",
         )
+        _evaluate_and_log(pipe, run_id, train_df, val_df, "lgb")
+
+        y_pred_train = pipe.predict(X_train_raw)
+        predictions = pd.DataFrame({
+            "y_true": np.concatenate([y_train, y_val]),
+            "y_pred": np.concatenate([y_pred_train, y_pred]),
+            "split": ["train"] * len(train_df) + ["val"] * len(val_df),
+        })
 
         return {
-            "lgb_val_accuracy": acc,
-            "lgb_val_defer_f1": f1,
+            "lgb_results": {
+                "lgb_val_accuracy": acc,
+                "lgb_val_defer_f1": f1,
+                "lgb_operational": operational,
+                "run_id": run_id,
+            },
+            "lgb_predictions": predictions,
         }
 
 

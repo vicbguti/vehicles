@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import time
 
 import numpy as np
 import pandas as pd
@@ -8,6 +9,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
+
+from fleet_loading.pipelines.training.operational import (
+    DEFERRED,
+    aggregate_operational,
+    episode_report,
+    greedy_report,
+)
 
 TRUCK_NAMES = ["CAMION_1", "CAMION_2", "CAMION_3", "CAMION_4"]
 DEFER_LABEL = 4  # index for SIN_CAMION
@@ -214,6 +222,85 @@ def predict_with_capacity(
     return preds
 
 
+def attention_operational_report(
+    model: nn.Module,
+    val_loader: DataLoader,
+    val_ds: EpisodeDataset,
+    episodes: pd.DataFrame,
+    device,
+) -> dict:
+    """Capacity-aware operational report for the attention model vs teacher."""
+    ep = episodes.set_index("episode_id")
+    rows: list[dict] = []
+    latency: list[float] = []
+
+    model.eval()
+    with torch.no_grad():
+        for ep_ids in _episode_id_chunks(val_ds, val_loader.batch_size):
+            batch = None  # placeholder; reassigned below
+        for batch in val_loader:
+            pass
+    raise NotImplementedError
+
+
+def attention_operational_report(
+    model: nn.Module,
+    val_loader: DataLoader,
+    val_ds: EpisodeDataset,
+    episodes: pd.DataFrame,
+    device,
+) -> dict:
+    """Capacity-aware operational report for the attention model vs teacher."""
+    ep = episodes.set_index("episode_id")
+    rows: list[dict] = []
+    latency: list[float] = []
+
+    model.eval()
+    cursor = 0
+    with torch.no_grad():
+        for batch in val_loader:
+            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+            logits = model(batch)
+            t0 = time.perf_counter()
+            cap_preds = predict_with_capacity(
+                logits, batch["cu"], batch["capacities"],
+                batch["n_trucks"], batch["pad_mask"],
+            )
+            latency_ms = (time.perf_counter() - t0) * 1000.0
+
+            n_eps = batch["cu"].shape[0]
+            for i in range(n_eps):
+                ep_id = val_ds.episode_ids[cursor + i]
+                n = int((batch["labels"][i] != -100).sum().item())
+                caps = np.asarray(ep.loc[ep_id, "truck_capacities"], dtype=float)
+                cu = batch["cu"][i, :n].cpu().numpy().astype(float)
+                teacher_n = int(ep.loc[ep_id, "n_loaded"])
+                teacher_cu = float(ep.loc[ep_id, "cu_utilized"])
+
+                assign = cap_preds[i, :n].cpu().numpy().astype(int)
+                assign = np.where(assign == DEFER_LABEL, DEFERRED, assign)
+
+                rows.append(
+                    episode_report(ep_id, assign, cu, caps, teacher_n, teacher_cu)
+                )
+                latency.append(latency_ms / n_eps)
+
+            cursor += n_eps
+
+    return {
+        "model": aggregate_operational(rows, latency),
+        "greedy": aggregate_operational(*greedy_report(val_ds.df, episodes)),
+    }
+
+
+def _attention_predictions_df(cap_labels_all, cap_preds_all) -> pd.DataFrame:
+    """Combine capacity-aware val predictions into a DataFrame for the report node."""
+    return pd.DataFrame({
+        "y_true": np.concatenate(cap_labels_all),
+        "y_pred": np.concatenate(cap_preds_all),
+    })
+
+
 def train_attention(
     train_df: pd.DataFrame,
     val_df: pd.DataFrame,
@@ -260,14 +347,17 @@ def train_attention(
         model.train()
         total_loss = 0.0
         n_batches = 0
+        train_correct = 0
+        train_total = 0
 
         for batch in train_loader:
             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
             logits = model(batch)
 
+            labels = batch["labels"]
             loss = F.cross_entropy(
                 logits.reshape(-1, MAX_TRUCKS + 1),
-                batch["labels"].reshape(-1),
+                labels.reshape(-1),
                 ignore_index=-100,
             )
 
@@ -276,11 +366,17 @@ def train_attention(
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
             optimizer.step()
 
+            mask = labels != -100
+            preds = logits.argmax(dim=-1)
+            train_correct += ((preds == labels) & mask).sum().item()
+            train_total += mask.sum().item()
+
             total_loss += loss.item()
             n_batches += 1
 
         scheduler.step()
         train_loss = total_loss / n_batches
+        train_acc = train_correct / train_total if train_total > 0 else 0.0
 
         model.eval()
         n_correct = 0
@@ -312,11 +408,11 @@ def train_attention(
         def_rec = n_def_correct / n_def_actual if n_def_actual > 0 else 0.0
         def_f1 = 2 * def_prec * def_rec / (def_prec + def_rec) if (def_prec + def_rec) > 0 else 0.0
 
-        train_epochs.append(train_loss)
+        train_epochs.append({"loss": train_loss, "acc": train_acc})
         val_metrics.append({"acc": acc, "def_f1": def_f1})
 
         if (epoch + 1) % 10 == 0 or epoch == 0:
-            print(f"Epoch {epoch+1:3d}/{n_epochs}  train_loss={train_loss:.4f}  val_acc={acc:.4f}  val_def_f1={def_f1:.4f}")
+            print(f"Epoch {epoch+1:3d}/{n_epochs}  train_loss={train_loss:.4f}  train_acc={train_acc:.4f}  val_acc={acc:.4f}  val_def_f1={def_f1:.4f}")
 
     best_idx = int(np.argmax([m["def_f1"] for m in val_metrics]))
     best = val_metrics[best_idx]
@@ -332,6 +428,8 @@ def train_attention(
     cap_def_pred = 0
     n_total = 0
     n_def_actual = 0
+    cap_labels_all = []
+    cap_preds_all = []
 
     with torch.no_grad():
         for batch in val_loader:
@@ -343,6 +441,8 @@ def train_attention(
                 logits, batch["cu"], batch["capacities"],
                 batch["n_trucks"], batch["pad_mask"],
             )
+            cap_labels_all.append(labels[mask].cpu().numpy())
+            cap_preds_all.append(cap_preds[mask].cpu().numpy())
             cap_correct += ((cap_preds == labels) & mask).sum().item()
             n_total += mask.sum().item()
             def_actual = (labels == DEFER_LABEL) & mask
@@ -361,7 +461,12 @@ def train_attention(
     import tempfile
     import os
 
+    operational = attention_operational_report(
+        model, val_loader, val_ds, episodes, device
+    )
+
     with mlflow.start_run(run_name=run_name):
+        run_id = mlflow.active_run().info.run_id
         mlflow.log_params({
             "att_d_model": d_model,
             "att_nhead": nhead,
@@ -378,14 +483,33 @@ def train_attention(
         mlflow.log_metric("att_cap_accuracy", cap_acc)
         mlflow.log_metric("att_cap_defer_f1", cap_def_f1)
 
+        for epoch, (tm, vm) in enumerate(zip(train_epochs, val_metrics), start=1):
+            mlflow.log_metric("att_train_loss", tm["loss"], step=epoch)
+            mlflow.log_metric("att_train_accuracy_curve", tm["acc"], step=epoch)
+            mlflow.log_metric("att_val_accuracy_curve", vm["acc"], step=epoch)
+            mlflow.log_metric("att_val_defer_f1_curve", vm["def_f1"], step=epoch)
+
+        for agg in ("model", "greedy"):
+            for k, v in operational[agg].items():
+                if isinstance(v, dict):
+                    for sub_k, sub_v in v.items():
+                        mlflow.log_metric(f"att_{agg}_{k}_{sub_k}", sub_v)
+                else:
+                    mlflow.log_metric(f"att_{agg}_{k}", v)
+
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "model.pt")
             torch.save({"model_state_dict": model.state_dict(), "n_canton": train_ds.n_canton, "n_clase": train_ds.n_clase}, path)
             mlflow.log_artifact(path, "model")
 
     return {
-        "att_val_accuracy": best["acc"],
-        "att_val_defer_f1": best["def_f1"],
-        "att_cap_accuracy": cap_acc,
-        "att_cap_defer_f1": cap_def_f1,
+        "att_results": {
+            "att_val_accuracy": best["acc"],
+            "att_val_defer_f1": best["def_f1"],
+            "att_cap_accuracy": cap_acc,
+            "att_cap_defer_f1": cap_def_f1,
+            "att_operational": operational,
+            "run_id": run_id,
+        },
+        "att_predictions": _attention_predictions_df(cap_labels_all, cap_preds_all),
     }

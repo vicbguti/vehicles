@@ -29,3 +29,35 @@ lgb_results:
 att_results:
   type: json.JSONDataset
   filepath: data/07_model_output/att_results.json
+
+xgb_predictions:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/xgb_predictions.parquet
+
+lgb_predictions:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/lgb_predictions.parquet
+
+att_predictions:
+  type: pandas.ParquetDataset
+  filepath: data/07_model_output/att_predictions.parquet
+
+xgb_confusion_matrix_train:
+  type: matplotlib.MatplotlibDataset
+  filepath: data/08_reporting/xgb_confusion_matrix_train.png
+
+xgb_confusion_matrix_val:
+  type: matplotlib.MatplotlibDataset
+  filepath: data/08_reporting/xgb_confusion_matrix_val.png
+
+lgb_confusion_matrix_train:
+  type: matplotlib.MatplotlibDataset
+  filepath: data/08_reporting/lgb_confusion_matrix_train.png
+
+lgb_confusion_matrix_val:
+  type: matplotlib.MatplotlibDataset
+  filepath: data/08_reporting/lgb_confusion_matrix_val.png
+
+att_confusion_matrix_val:
+  type: matplotlib.MatplotlibDataset
+  filepath: data/08_reporting/att_confusion_matrix_val.png

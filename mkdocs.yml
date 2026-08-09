@@ -24,6 +24,7 @@ nav:
     - Approach: proposals/04_method.md
     - Feasibility: proposals/06_feasibility.md
   - Evaluation: proposals/05_evaluation.md
+  - Operational metrics: metrics.md
   - Kedro pipeline: kedro.md
   - Tarea 4 (MLP):
     - Overview: tarea4/README.md
