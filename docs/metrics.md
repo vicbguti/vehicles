@@ -4,7 +4,8 @@ The models are judged on the delivery's three formal metrics, computed against
 the **exact teacher** in `data/episodes/episodes.parquet`, which carries
 `n_loaded` and `cu_utilized` per episode (i.e. `V_exact` for every manifest).
 All three models are evaluated on the same held-out validation split (6,968
-episodes) via `fleet_loading/src/fleet_loading/pipelines/training/operational.py`.
+episodes) via `src/modeling/metrics.py` (the same machinery that evaluates the
+MLP), through `fleet_loading/src/fleet_loading/pipelines/training/pairwise.py`.
 
 ## The three delivery metrics
 
@@ -28,10 +29,11 @@ meaningless.
 
 `max_overflow_cu` may be a tiny nonzero float (~1e-7) for the attention model
 because its decoder packs in float32 and the report re-checks in float64. Any
-overflow below `_VIOLATION_TOL = 1e-6` is treated as measurement noise, not a
-violation.
+overflow below `_TOL = 1e-9` is treated as measurement noise, not a violation.
 
-## Per-episode report (`episode_report`)
+## Per-episode report (`EpisodeResult`)
+
+Built by `src.modeling.metrics.build_result` from `capacity_decoder.DecodedEpisode`:
 
 | Field | Meaning |
 |---|---|
@@ -43,25 +45,26 @@ violation.
 | `model_cu`, `teacher_cu` | CU utilized by model / teacher |
 | `max_overflow` | largest over-capacity load (CU) |
 
-## Aggregates (`aggregate_operational`)
+## Aggregates (`aggregate`)
 
 | Metric | Formula |
 |---|---|
-| `capacity_violation_rate` | mean(max_overflow > 1e-6) — must be 0 |
+| `capacity_violation_rate` | mean(max_overflow > 1e-9) — must be 0 |
 | `loaded_gap_mean` | mean(teacher_n_loaded − model_n_loaded) |
 | `episodes_matching_teacher_count_pct` | % episodes where model_n_loaded = teacher_n_loaded |
 | `optimality_gap_loaded_pct` | 100 · mean((teacher − model)/teacher) |
 | `cu_gap_mean` | mean(teacher_cu − model_cu) |
 | `cu_utilization_model_pct` | 100 · Σ model_cu / Σ total_capacity |
 | `cu_utilization_teacher_pct` | 100 · Σ teacher_cu / Σ total_capacity |
-| `latency.mean_ms / median_ms / p99_ms` | manifest → assignment compute time |
+| `latency.mean_ms / median_ms / p99_ms` | decoder (`decode_episode`) compute time per manifest |
 
 ## Baselines
 
-Each model is reported against the **greedy baseline** (`greedy_report`,
-largest-first fit), the manual heuristic the delivery asks to beat. Results in
-`docs/index.md` show all learned models beat greedy on the primary objective;
-XGBoost is nearest the teacher (0.18% optimality gap).
+Each model is reported against the **greedy baseline**
+(`src.modeling.metrics.evaluate_greedy`, largest-first fit), the manual
+heuristic the delivery asks to beat. Results in `docs/index.md` show all learned
+models beat greedy on the primary objective by a wide margin (optimality gap
+~0.15% vs greedy's 4.49%).
 
 ## In MLflow
 
@@ -80,9 +83,9 @@ Examples: `xgb_model_optimality_gap_loaded_pct` = the XGBoost model's
 optimality gap; `xgb_greedy_latency_mean_ms` = the greedy baseline's mean
 compute time; `att_model_capacity_violation_rate` = attention feasibility gate.
 Each `<aggregate metric>` name is exactly the key documented in the
-[aggregates table](#aggregates-aggregate_operational) above, so the MLflow UI
+[aggregates table](#aggregates-aggregate) above, so the MLflow UI
 maps 1:1 onto the formulas here. Note the `latency_*` keys appear individually
-(`_mean_ms`, `_median_ms`, `_p99_ms`, `_n_timed`) rather than nested.
+(`_mean_ms`, `_median_ms`, `_p99_ms`, `_n_manifests_timed`) rather than nested.
 
 ### Training curves (loss vs rounds/epochs)
 
@@ -90,13 +93,13 @@ Curves are logged natively and render as line charts in the MLflow UI. The
 GBTs also re-log their curves under unambiguous names (autolog uses the
 framework's own eval-set labels, which both call the train split "validation"):
 
-- **XGBoost**: `xgb_train_mlogloss` / `xgb_train_accuracy_curve` (train),
-  `xgb_val_mlogloss` / `xgb_val_accuracy_curve` (val) — one step per boosting
-  round (500). Autolog's `validation_0/1-mlogloss` are the same loss data under
+- **XGBoost**: `xgb_train_logloss` / `xgb_train_accuracy_curve` (train),
+  `xgb_val_logloss` / `xgb_val_accuracy_curve` (val) — one step per boosting
+  round (500). Autolog's `validation_0/1-logloss` are the same loss data under
   XGBoost's naming.
-- **LightGBM**: `lgb_train_multi_logloss` / `lgb_train_accuracy_curve`,
-  `lgb_val_multi_logloss` / `lgb_val_accuracy_curve` — one step per round until
-  early stopping. Autolog's `training/valid_1-multi_logloss` are the same data
+- **LightGBM**: `lgb_train_binary_logloss` / `lgb_train_accuracy_curve`,
+  `lgb_val_binary_logloss` / `lgb_val_accuracy_curve` — one step per round until
+  early stopping. Autolog's `training/valid_1-binary_logloss` are the same data
   under LightGBM's naming.
 - **Attention**: `att_train_loss` / `att_train_accuracy_curve`,
   `att_val_accuracy_curve`, `att_val_defer_f1_curve` — one step per epoch (50).
@@ -109,7 +112,10 @@ framework's native `eval_set` results) plus per-epoch `mlflow.log_metric(..., st
 Confusion matrices are **not** produced during training. Training nodes only
 emit predictions (`*_predictions.parquet`); the `report_confusion_matrices`
 Kedro node renders figures from them into `data/08_reporting/`. All three
-models are **per-truck** (Camión 1..4 + Sin camión), so the matrices are 5-way:
+models emit predictions in the canonical index space (`0 = Sin camión`, `1..T =
+trucks by capacity descending`), so the matrices are `(T+1)`-way with **dynamic
+labels** — one column per truck index actually present, never a fixed truck
+count:
 
 | Figure | Predictions source |
 |---|---|
@@ -118,8 +124,8 @@ models are **per-truck** (Camión 1..4 + Sin camión), so the matrices are 5-way
 | `att_confusion_matrix_val.png` (capacity-aware decoder) | `att_predictions.parquet` |
 
 Because figures are a pure function of `(y_true, y_pred, labels)`, restyling
-them never requires retraining — edit `CONFUSION_LABELS` in `operational.py`
-or `_confusion_matrix_figure` in `nodes.py`, then:
+them never requires retraining — edit `_confusion_matrix_figure` in `nodes.py`,
+then:
 
 ```bash
 kedro run --nodes report_confusion_matrices
@@ -127,7 +133,6 @@ kedro run --nodes report_confusion_matrices
 
 The report node also overwrites the `confusion_matrix.png` artifact that
 `mlflow.evaluate()` logs with numeric labels: MLflow needs numeric class labels
-for its confusion-matrix computation, so `_evaluate_and_log` leaves MLflow's
-plot untouched at training time, and the report node replaces it with a
-readable normalized version (using `CONFUSION_LABELS`) in the same run, located
-via the `run_id` stored in each model's results.
+for its confusion-matrix computation, so training leaves MLflow's plot
+untouched, and the report node replaces it with a readable normalized version
+in the same run, located via the `run_id` stored in each model's results.

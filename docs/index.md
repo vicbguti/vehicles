@@ -4,22 +4,33 @@ Supervised imitation learning for capacitated fleet loading — assign vehicles 
 
 ## Models
 
-Per-vehicle **per-truck** classification (CAMION_1..4 + defer) on the raw labels, and the **operational metrics** from `operational.py` (evaluated on the full held-out val split, 6,968 episodes) that the delivery specifies: fill efficiency, compute ms, and the gap vs the exact teacher (`n_loaded` per episode in `episodes.parquet`). All three models predict which truck each vehicle goes on (or defer) and decode capacity-aware; Greedy = largest-first pack baseline. All plans are feasible by construction (`capacity_violation_rate = 0.0` for every model).
+All three models are **pairwise**: they score every `(vehicle, truck)` option plus a defer option and decode with a capacity-respecting decoder, so the truck axis is fully dynamic (any number of trucks, including the 5–10 used in extrapolation tests). They share the canonical `src/modeling` feature tensors and evaluation machinery. Operational metrics are computed against the exact teacher on the held-out val split (6,968 episodes, GroupShuffleSplit by episode_id): fill efficiency, compute ms, and the gap vs the teacher's `n_loaded`. Greedy = largest-first pack baseline. All plans are feasible by construction (`capacity_violation_rate = 0.0` for every model).
 
-| Model | Accuracy | Defer F1 | Opt. gap (veh) | Matches teacher | Fill (CU) | Compute (mean/p99 ms) |
+| Model | Per-vehicle acc (decoded) | Defer F1 | Opt. gap (veh) | Matches teacher | Fill (CU) | Compute (mean/p99 ms) |
 |---|---|---|---|---|---|---|
-| **XGBoost** | 76.5% | 0.616 | 0.24% | 96.6% | 35.93% | 30.5 / 56.3 |
-| **LightGBM** | 77.9% | 0.614 | 0.33% | 96.3% | 35.97% | 17.4 / 35.3 |
-| **Transformer** | **78.7%** | **0.664** | 4.64% | 86.2% | **36.30%** | **3.55 / 4.1** |
-| Greedy baseline | — | — | 4.49% | 87.2% | **36.40%** | 0.02 / 0.04 |
+| **XGBoost** | 81.0% | 0.625 | 0.15% | 97.5% | 35.82% | 0.07 / 0.15 |
+| **LightGBM** | 80.9% | 0.625 | 0.15% | 97.5% | 35.82% | 0.07 / 0.15 |
+| **Transformer** | **82.1%** | **0.703** | 0.16% | 97.4% | **35.82%** | **0.08 / 0.16** |
+| Greedy baseline | — | — | 4.49% | ~87% | 36.40% | 0.02 / 0.04 |
 
 Notes:
 
-- **Per-truck accuracy** (all models, raw labels) is now comparable: attention leads at ~78-79%, the GBTs at ~77%. The old binary "95.8%" was inflated by predicting the majority `loaded` class; the per-truck task is genuinely harder and is what the problem specifies (`docs/proposals/04_method.md`).
-- **Optimality gap** = `(V_teacher − V_model)/V_teacher` on the primary objective (vehicles loaded). The teacher is the exact DP = brute-force optimum on all 34,839 episodes, so this is the delivery's "brecha óptima en instancias acotadas".
+- **Per-vehicle accuracy** (all models, capacity-aware decoded labels) is 81–82%; attention's raw-label val accuracy is 84.6%. The greedy baseline's raw per-vehicle accuracy is ~0.21 on the held-out split.
+- **Optimality gap** = `(V_teacher − V_model)/V_teacher` on the primary objective (vehicles loaded). The teacher is the exact DP = brute-force optimum on all 34,839 episodes, so this is the delivery's "brecha óptima en instancias acotadas". All three models now land at ~0.15% — two orders of magnitude closer to the teacher than greedy (4.49%) and a large improvement over the previous per-truck formulation (0.24–4.64%).
+- **Extrapolation beyond training (5–10 trucks):** each model was evaluated on re-labeled manifests with larger fleets (see `scripts/evaluate_fleet_loading.py`). With 5–6 trucks at the same per-truck capacity distribution, all three models match the teacher's `n_loaded` on **100%** of episodes. In the hard scenario (8–10 trucks, total capacity held constant), the models stay at ~98.3–98.6% teacher-matching (XGB 98.4%, LGB 98.3%, attention 98.6%) with zero capacity violations — the pairwise structure generalizes beyond the `1–4` trucks seen in training.
+- **Compute** is the decoder latency in ms (`decode_episode` only, shared step; score assembly is model-specific). All three learned models decode a manifest in <0.1 ms median — far below the greedy baseline's 0.02 ms but all well within interactive bounds. (Greedy's raw-accuracy/fill columns above are from the pre-pairwise report; its decoder latency is 0.02/0.04 ms.)
 - **Fill efficiency** is capped at ~36% because episodes are capacity-rich (more truck capacity than CU demand — see `docs/proposals/09_scenarios_coverage.md`); teacher and all models converge near the same value, so the discriminating metric is the loaded-gap.
-- **Compute** is the full manifest→assignment latency in ms (`time.perf_counter`). Greedy is a linear-time baseline; the Transformer is fastest among the learned models thanks to batched inference.
-- On the primary objective the GBTs beat the teacher on a fraction of episodes (they load as many as fit; the exact teacher's lexicographic tie-break on identical vehicles is unlearnable) and sit ~0.2% below it in aggregate; attention trades some optimality for the fastest latency and the best per-truck accuracy.
+
+## Extrapolation results
+
+All three models evaluated on re-labeled manifests with fleets larger than the training range (1–4 trucks); `loaded_gap_mean` = mean(teacher − model vehicles loaded):
+
+| Set (trucks, capacity mode) | XGBoost | LightGBM | Attention | Greedy |
+|---|---|---|---|---|
+| 5–6, same distribution | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| 8–10, constant total | 0.0274 | 0.0294 | 0.0209 | 0.0157 |
+
+Per-model JSON with full aggregates: `artifacts/fleet_loading/<model>/extrap_*_metrics.json`.
 
 ## Quick start
 

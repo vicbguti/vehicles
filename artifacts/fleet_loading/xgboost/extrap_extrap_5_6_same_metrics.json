@@ -1,0 +1,182 @@
+{
+  "generated": "2026-08-09 19:43 UTC",
+  "model": "xgboost",
+  "episodes_dir": "data/episodes/extrap_5_6_same",
+  "decoder_policy": "model",
+  "max_trucks_in_set": 6,
+  "max_trucks_seen_in_training": 4,
+  "model_metrics": {
+    "capacity_violation_rate": 0.0,
+    "max_overflow_cu": 8.881784197001252e-16,
+    "loaded_gap_mean": 0.0,
+    "loaded_gap_max": 0,
+    "episodes_matching_teacher_count_pct": 100.0,
+    "optimality_gap_loaded_pct": 0.0,
+    "cu_gap_mean": -1.4247983009689795e-15,
+    "cu_utilization_model_pct": 17.165453046542446,
+    "cu_utilization_teacher_pct": 17.165453046542446,
+    "deferred_model_total": 0,
+    "deferred_teacher_total": 0,
+    "macro_f1": 0.18466545017206618,
+    "raw_assignment_accuracy": 0.1858027238959967,
+    "class_level_agreement_mean": 0.19786460072430814,
+    "episodes_identical_to_teacher_pct": 11.6263879817113,
+    "confusion_matrix": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        425,
+        784,
+        750,
+        1203,
+        1604,
+        545
+      ],
+      [
+        0,
+        428,
+        512,
+        639,
+        1152,
+        1404,
+        604
+      ],
+      [
+        0,
+        343,
+        449,
+        613,
+        1072,
+        1570,
+        536
+      ],
+      [
+        0,
+        224,
+        492,
+        436,
+        991,
+        1446,
+        575
+      ],
+      [
+        0,
+        259,
+        354,
+        408,
+        1015,
+        1316,
+        454
+      ],
+      [
+        0,
+        142,
+        153,
+        154,
+        274,
+        259,
+        645
+      ]
+    ],
+    "n_episodes": 1531,
+    "n_vehicle_rows": 24230
+  },
+  "baseline_greedy": {
+    "capacity_violation_rate": 0.0,
+    "max_overflow_cu": 1.7763568394002505e-15,
+    "loaded_gap_mean": 0.0,
+    "loaded_gap_max": 0,
+    "episodes_matching_teacher_count_pct": 100.0,
+    "optimality_gap_loaded_pct": 0.0,
+    "cu_gap_mean": -1.4234930093658931e-15,
+    "cu_utilization_model_pct": 17.165453046542446,
+    "cu_utilization_teacher_pct": 17.165453046542446,
+    "deferred_model_total": 0,
+    "deferred_teacher_total": 0,
+    "macro_f1": 0.08944651713739175,
+    "raw_assignment_accuracy": 0.21473380107304993,
+    "class_level_agreement_mean": 0.22683351311130057,
+    "episodes_identical_to_teacher_pct": 15.34944480731548,
+    "confusion_matrix": [
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        4541,
+        624,
+        128,
+        16,
+        2,
+        0
+      ],
+      [
+        0,
+        4039,
+        562,
+        122,
+        14,
+        2,
+        0
+      ],
+      [
+        0,
+        3946,
+        530,
+        96,
+        10,
+        1,
+        0
+      ],
+      [
+        0,
+        3628,
+        436,
+        96,
+        4,
+        0,
+        0
+      ],
+      [
+        0,
+        3365,
+        363,
+        75,
+        3,
+        0,
+        0
+      ],
+      [
+        0,
+        1412,
+        173,
+        40,
+        2,
+        0,
+        0
+      ]
+    ],
+    "n_episodes": 1531,
+    "n_vehicle_rows": 24230
+  },
+  "inference_latency_per_manifest": {
+    "n_manifests_timed": 1531,
+    "mean_ms": 0.0656964990848269,
+    "median_ms": 0.07186600123532116,
+    "p99_ms": 0.13645400031236932
+  }
+}

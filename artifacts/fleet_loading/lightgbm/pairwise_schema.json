@@ -1,0 +1,117 @@
+{
+  "classes": [
+    "AUTOMOVIL",
+    "CAMIONETA",
+    "JEEP",
+    "MOTOCICLETA"
+  ],
+  "max_trucks_padding": 4,
+  "blocks": {
+    "vehicle": {
+      "names": [
+        "cu",
+        "clase_automovil",
+        "clase_camioneta",
+        "clase_jeep",
+        "clase_motocicleta",
+        "n_misma_clase"
+      ],
+      "mean": [
+        0.39865838003082094,
+        0.06917998838059183,
+        0.057117824546936785,
+        0.08308111096534793,
+        0.7906210761071234,
+        12.88858486853202
+      ],
+      "std": [
+        0.3928809079588518,
+        0.2537599605683997,
+        0.2320676165817729,
+        0.2760047825059153,
+        0.4068653218468648,
+        6.451414628463692
+      ],
+      "standardized": [
+        true,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
+    },
+    "truck": {
+      "names": [
+        "capacidad",
+        "capacidad_rel_flota",
+        "capacidad_rel_demanda"
+      ],
+      "mean": [
+        5.996254444428426,
+        0.40120053545348255,
+        1.7338658922186714
+      ],
+      "std": [
+        1.7339775559256598,
+        0.23317009954954274,
+        1.5266365322407693
+      ],
+      "standardized": [
+        true,
+        true,
+        true
+      ]
+    },
+    "context": {
+      "names": [
+        "n_vehiculos",
+        "n_camiones",
+        "cu_total",
+        "capacidad_total",
+        "deficit_capacidad",
+        "ratio_utilizacion",
+        "conteo_automovil",
+        "conteo_camioneta",
+        "conteo_jeep",
+        "conteo_motocicleta"
+      ],
+      "mean": [
+        15.315991532417208,
+        2.4925191058806644,
+        6.105848372860704,
+        14.945778766459785,
+        -8.83993039359908,
+        0.5647600954031593,
+        1.0595601162498653,
+        0.8748161171109755,
+        1.2724695920490834,
+        12.109145707007283
+      ],
+      "std": [
+        5.7098277988618245,
+        1.1156798357719482,
+        4.822918636624158,
+        7.220885516724725,
+        8.666409061928007,
+        0.660491506295133,
+        1.8063185696432509,
+        1.498234683327051,
+        2.1738912983206844,
+        6.085195140509236
+      ],
+      "standardized": [
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ]
+    }
+  }
+}

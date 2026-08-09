@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import math
-import time
-
 import numpy as np
 import pandas as pd
 import torch
@@ -10,135 +7,110 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 
-from fleet_loading.pipelines.training.operational import (
-    DEFERRED,
-    aggregate_operational,
-    episode_report,
-    greedy_report,
+from fleet_loading.pipelines.training.pairwise import (
+    build_tensors,
+    derive_classes,
+    evaluate_split,
+    measure_latency,
+    select_policy,
+    stack_episode_logits,
 )
+from src.modeling.capacity_decoder import DEFERRED, decode_episode
 
-TRUCK_NAMES = ["CAMION_1", "CAMION_2", "CAMION_3", "CAMION_4"]
-DEFER_LABEL = 4  # index for SIN_CAMION
-MAX_TRUCKS = 4
-
-
-def encode_target(truck_series: pd.Series, n_trucks: int) -> np.ndarray:
-    labels = np.full(len(truck_series), DEFER_LABEL, dtype=np.int64)
-    for i, name in enumerate(TRUCK_NAMES[:n_trucks]):
-        mask = truck_series.values == name
-        labels[mask] = i
-    return labels
+DEFER_LABEL = 0  # canonical index of SIN_CAMION (index 0, trucks 1..T)
 
 
 class EpisodeDataset(Dataset):
-    def __init__(self, df: pd.DataFrame, episodes: pd.DataFrame):
-        self.df = df
-        self.episodes = episodes.set_index("episode_id")
+    """One item per episode: canonical pairwise tensors from src/modeling.
 
-        self.canton_codes, _ = pd.factorize(df["canton"])
-        self.clase_codes, _ = pd.factorize(df["clase"])
-        self.n_canton = int(self.canton_codes.max() + 1)
-        self.n_clase = int(self.clase_codes.max() + 1)
+    The truck axis is dynamic: ``truck`` is ``(T, Dt)`` with T the episode's real
+    truck count (no MAX_TRUCKS padding), so the model accepts any number of
+    trucks at inference with the same weights.
+    """
 
-        self.episode_ids = df["episode_id"].unique()
-        self.episode_indices = df.groupby("episode_id").indices
+    def __init__(self, df: pd.DataFrame, classes: list[str], scaler=None):
+        self.episodes, self.arrays, self.scaler = build_tensors(df, classes, scaler)
+        self.classes = classes
 
     def __len__(self):
-        return len(self.episode_ids)
+        return len(self.episodes)
 
     def __getitem__(self, idx):
-        ep_id = self.episode_ids[idx]
-        indices = self.episode_indices[ep_id]
-        group = self.df.iloc[indices]
-        ep_row = self.episodes.loc[ep_id]
-
-        n = len(group)
-        cu = group["cu"].values.astype(np.float32)
-        canton = self.canton_codes[indices].astype(np.int64)
-        clase = self.clase_codes[indices].astype(np.int64)
-
-        iso_week = float(ep_row["iso_week"])
-        iso_week_sin = math.sin(2 * math.pi * iso_week / 52)
-        iso_week_cos = math.cos(2 * math.pi * iso_week / 52)
-        n_vehicles = float(n)
-        n_trucks = int(ep_row["n_trucks"])
-        total_cu = float(cu.sum())
-        total_capacity = float(sum(ep_row["truck_capacities"]))
-
-        episode_feats = np.array(
-            [iso_week_sin, iso_week_cos, n_vehicles, n_trucks, total_cu, total_capacity],
-            dtype=np.float32,
-        )
-
-        labels = encode_target(group["truck"], n_trucks)
-
-        # mask for trucks that don't exist in this episode
-        label_mask = np.ones(MAX_TRUCKS + 1, dtype=bool)
-        label_mask[n_trucks] = False  # defer always valid
-        label_mask[:n_trucks] = False
-
+        ep = self.episodes[idx]
+        vehicle = self.scaler.transform("vehicle", ep.vehicle)
+        truck = self.scaler.transform("truck", ep.truck)
+        context = self.scaler.transform("context", ep.context[None, :])[0]
         return {
-            "cu": cu,
-            "canton": canton,
-            "clase": clase,
-            "episode_feats": episode_feats,
-            "labels": labels,
-            "label_mask": label_mask,
-            "n": n,
-            "n_trucks": n_trucks,
-            "capacities": np.array(ep_row["truck_capacities"], dtype=np.float32),
+            "vehicle": torch.from_numpy(vehicle.astype(np.float32)),
+            "truck": torch.from_numpy(truck.astype(np.float32)),
+            "context": torch.from_numpy(context.astype(np.float32)),
+            "labels": torch.from_numpy(ep.target.astype(np.int64)),
+            "cu": torch.from_numpy(ep.cu.astype(np.float32)),
+            "capacities": torch.from_numpy(ep.capacities.astype(np.float32)),
+            "episode_id": ep.episode_id,
+            "n_trucks": ep.n_trucks,
+            "teacher_n_loaded": ep.teacher_n_loaded,
+            "teacher_cu_utilized": ep.teacher_cu_utilized,
         }
 
 
 def collate_episodes(batch):
-    max_n = max(item["n"] for item in batch)
-    n_feats = len(batch[0]["episode_feats"])
+    max_n = max(item["labels"].shape[0] for item in batch)
+    max_t = max(item["n_trucks"] for item in batch)
+    vehicle_dim = batch[0]["vehicle"].shape[1]
+    truck_dim = batch[0]["truck"].shape[1]
+    context_dim = batch[0]["context"].shape[0]
     n_eps = len(batch)
 
-    cu = torch.zeros(n_eps, max_n)
-    canton = torch.zeros(n_eps, max_n, dtype=torch.long)
-    clase = torch.zeros(n_eps, max_n, dtype=torch.long)
+    vehicle = torch.zeros(n_eps, max_n, vehicle_dim)
+    truck = torch.zeros(n_eps, max_t, truck_dim)
+    context = torch.zeros(n_eps, context_dim)
     labels = torch.full((n_eps, max_n), -100, dtype=torch.long)
-    episode_feats = torch.zeros(n_eps, n_feats)
-    label_mask = torch.zeros(n_eps, MAX_TRUCKS + 1, dtype=torch.bool)
+    cu = torch.zeros(n_eps, max_n)
+    capacities = torch.zeros(n_eps, max_t)
     pad_mask = torch.ones(n_eps, max_n, dtype=torch.bool)
+    truck_mask = torch.ones(n_eps, max_t, dtype=torch.bool)
 
     for i, item in enumerate(batch):
-        n = item["n"]
-        cu[i, :n] = torch.from_numpy(item["cu"])
-        canton[i, :n] = torch.from_numpy(item["canton"])
-        clase[i, :n] = torch.from_numpy(item["clase"])
-        labels[i, :n] = torch.from_numpy(item["labels"])
-        episode_feats[i] = torch.from_numpy(item["episode_feats"])
-        label_mask[i] = torch.from_numpy(item["label_mask"])
+        n, t = item["labels"].shape[0], item["n_trucks"]
+        vehicle[i, :n] = item["vehicle"]
+        truck[i, :t] = item["truck"]
+        context[i] = item["context"]
+        labels[i, :n] = item["labels"]
+        cu[i, :n] = item["cu"]
+        capacities[i, :t] = item["capacities"]
         pad_mask[i, :n] = False
-
-    capacities = torch.zeros(n_eps, MAX_TRUCKS)
-    n_trucks_arr = torch.zeros(n_eps, dtype=torch.long)
-
-    for i, item in enumerate(batch):
-        n = item["n"]
-        capacities[i, :item["n_trucks"]] = torch.from_numpy(item["capacities"])
-        n_trucks_arr[i] = item["n_trucks"]
+        truck_mask[i, :t] = False
 
     return {
-        "cu": cu,
-        "canton": canton,
-        "clase": clase,
-        "episode_feats": episode_feats,
+        "vehicle": vehicle,
+        "truck": truck,
+        "context": context,
         "labels": labels,
-        "label_mask": label_mask,
-        "pad_mask": pad_mask,
+        "cu": cu,
         "capacities": capacities,
-        "n_trucks": n_trucks_arr,
+        "pad_mask": pad_mask,
+        "truck_mask": truck_mask,
+        "episode_ids": [item["episode_id"] for item in batch],
+        "n_trucks": torch.tensor([item["n_trucks"] for item in batch]),
     }
 
 
-class AttentionModel(nn.Module):
+class PairwiseAttentionModel(nn.Module):
+    """Transformer over the vehicle set with a pairwise (vehicle, truck) head.
+
+    Same canonical feature blocks as the MLP/GBTs (src/modeling): vehicle
+    block (V, Dv), truck block (T, Dt), context (Dg). The transformer mixes
+    vehicle context; a shared pairwise head scores each (vehicle, truck) and a
+    separate defer head scores SIN_CAMION, concatenated into (V, 1 + T) logits
+    with SIN_CAMION at index 0. T is fully dynamic.
+    """
+
     def __init__(
         self,
-        n_canton: int,
-        n_clase: int,
+        vehicle_dim: int,
+        truck_dim: int,
+        context_dim: int,
         d_model: int = 64,
         nhead: int = 4,
         num_layers: int = 3,
@@ -146,13 +118,9 @@ class AttentionModel(nn.Module):
     ):
         super().__init__()
         self.d_model = d_model
-        self.canton_embed = nn.Embedding(n_canton, d_model // 4)
-        self.clase_embed = nn.Embedding(n_clase, d_model // 4)
-        self.cu_proj = nn.Linear(1, d_model // 4)
-        self.episode_proj = nn.Linear(6, d_model)
-
-        self.vehicle_dim = (d_model // 4) * 3
-        self.input_proj = nn.Linear(self.vehicle_dim, d_model)
+        self.vehicle_proj = nn.Linear(vehicle_dim, d_model)
+        self.context_proj = nn.Linear(context_dim, d_model)
+        self.truck_proj = nn.Linear(truck_dim, d_model)
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model,
@@ -164,27 +132,40 @@ class AttentionModel(nn.Module):
         )
         self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
-        self.output_head = nn.Linear(d_model, MAX_TRUCKS + 1)
+        self.pair_head = nn.Sequential(
+            nn.Linear(d_model * 2, d_model),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model, 1),
+        )
+        self.defer_head = nn.Sequential(
+            nn.Linear(d_model, d_model),
+            nn.GELU(),
+            nn.Dropout(dropout),
+            nn.Linear(d_model, 1),
+        )
 
     def forward(self, batch):
-        cu = batch["cu"].unsqueeze(-1)
-        canton = batch["canton"]
-        clase = batch["clase"]
-        episode_feats = batch["episode_feats"]
+        vehicle = batch["vehicle"]
+        truck = batch["truck"]
+        context = batch["context"]
         pad_mask = batch["pad_mask"]
+        truck_mask = batch["truck_mask"]  # True on padding trucks
 
-        cu_emb = self.cu_proj(cu)
-        canton_emb = self.canton_embed(canton)
-        clase_emb = self.clase_embed(clase)
+        v = self.vehicle_proj(vehicle)  # (B, V, d)
+        g = self.context_proj(context).unsqueeze(1)  # (B, 1, d)
+        v = v + g
+        h = self.transformer(v, src_key_padding_mask=pad_mask)  # (B, V, d)
 
-        ep_emb = self.episode_proj(episode_feats).unsqueeze(1)
-        vehicle_emb = torch.cat([cu_emb, canton_emb, clase_emb], dim=-1)
-        vehicle_emb = self.input_proj(vehicle_emb)
+        t = self.truck_proj(truck)  # (B, T, d)
+        B, V, T = h.shape[0], h.shape[1], t.shape[1]
+        hv = h[:, :, None, :].expand(B, V, T, self.d_model)
+        tv = t[:, None, :, :].expand(B, V, T, self.d_model)
+        pair = self.pair_head(torch.cat([hv, tv], dim=-1)).squeeze(-1)  # (B, V, T)
+        pair = pair.masked_fill(truck_mask[:, None, :], -1e9)
 
-        vehicle_emb = vehicle_emb + ep_emb
-
-        out = self.transformer(vehicle_emb, src_key_padding_mask=pad_mask)
-        logits = self.output_head(out)
+        defer = self.defer_head(h).squeeze(-1)  # (B, V)
+        logits = torch.cat([defer.unsqueeze(-1), pair], dim=-1)  # (B, V, 1+T)
         return logits
 
 
@@ -196,100 +177,64 @@ def predict_with_capacity(
     n_trucks_arr: torch.Tensor,
     pad_mask: torch.Tensor,
 ) -> torch.Tensor:
+    """Capacity-aware per-episode assignment via ``capacity_decoder.decode_episode``."""
     batch_size, max_n, _ = logits.shape
-    preds = torch.full((batch_size, max_n), DEFER_LABEL, dtype=torch.long, device=logits.device)
+    preds = torch.full((batch_size, max_n), -100, dtype=torch.long, device=logits.device)
 
     for b in range(batch_size):
         n = max_n - pad_mask[b].sum().item()
-        remaining = capacities[b].clone()
         n_trucks = int(n_trucks_arr[b].item())
-
-        cu_order = torch.argsort(cu[b, :n], descending=True)
-
-        for idx in cu_order:
-            vehicle_cu = cu[b, idx].item()
-            truck_logits = logits[b, idx, :n_trucks]
-            valid = remaining[:n_trucks] >= vehicle_cu
-            if valid.any():
-                masked = truck_logits.clone()
-                masked[~valid] = -float("inf")
-                chosen = masked.argmax().item()
-                preds[b, idx] = chosen
-                remaining[chosen] -= vehicle_cu
-            else:
-                preds[b, idx] = DEFER_LABEL
+        ep_logits = logits[b, :n, : n_trucks + 1].cpu().numpy()
+        decoded = decode_episode(
+            ep_logits,
+            cu=cu[b, :n].cpu().numpy(),
+            capacities=capacities[b, :n_trucks].cpu().numpy(),
+            policy="model",
+        )
+        assignment = np.where(decoded.assignment == DEFERRED, 0, decoded.assignment + 1)
+        preds[b, :n] = torch.from_numpy(assignment.astype(np.int64))
 
     return preds
 
 
+@torch.no_grad()
+def _episode_logits_batched(
+    model: nn.Module, loader: DataLoader, device
+) -> dict[str, np.ndarray]:
+    """One batched pass over the loader -> per-episode (V, 1+T) logits, keyed by episode_id."""
+    model.eval()
+    out = {}
+    for batch in loader:
+        batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+        logits = model(batch)
+        n_real = batch["labels"].shape[1] - batch["pad_mask"].sum(dim=1)
+        n_trucks = batch["n_trucks"]
+        for i, ep_id in enumerate(batch["episode_ids"]):
+            out[ep_id] = logits[i, : n_real[i], : n_trucks[i] + 1].cpu().numpy()
+    return out
+
+
+def _logits_by_index(episodes, by_id: dict[str, np.ndarray]) -> dict[int, np.ndarray]:
+    """Remap per-episode logits keyed by episode_id onto the episode-list order."""
+    return {i: by_id[ep.episode_id] for i, ep in enumerate(episodes)}
+
+
 def attention_operational_report(
     model: nn.Module,
     val_loader: DataLoader,
     val_ds: EpisodeDataset,
-    episodes: pd.DataFrame,
     device,
+    policy: str,
+    val_logits: np.ndarray,
 ) -> dict:
-    """Capacity-aware operational report for the attention model vs teacher."""
-    ep = episodes.set_index("episode_id")
-    rows: list[dict] = []
-    latency: list[float] = []
-
-    model.eval()
-    with torch.no_grad():
-        for ep_ids in _episode_id_chunks(val_ds, val_loader.batch_size):
-            batch = None  # placeholder; reassigned below
-        for batch in val_loader:
-            pass
-    raise NotImplementedError
-
-
-def attention_operational_report(
-    model: nn.Module,
-    val_loader: DataLoader,
-    val_ds: EpisodeDataset,
-    episodes: pd.DataFrame,
-    device,
-) -> dict:
-    """Capacity-aware operational report for the attention model vs teacher."""
-    ep = episodes.set_index("episode_id")
-    rows: list[dict] = []
-    latency: list[float] = []
-
-    model.eval()
-    cursor = 0
-    with torch.no_grad():
-        for batch in val_loader:
-            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
-            logits = model(batch)
-            t0 = time.perf_counter()
-            cap_preds = predict_with_capacity(
-                logits, batch["cu"], batch["capacities"],
-                batch["n_trucks"], batch["pad_mask"],
-            )
-            latency_ms = (time.perf_counter() - t0) * 1000.0
-
-            n_eps = batch["cu"].shape[0]
-            for i in range(n_eps):
-                ep_id = val_ds.episode_ids[cursor + i]
-                n = int((batch["labels"][i] != -100).sum().item())
-                caps = np.asarray(ep.loc[ep_id, "truck_capacities"], dtype=float)
-                cu = batch["cu"][i, :n].cpu().numpy().astype(float)
-                teacher_n = int(ep.loc[ep_id, "n_loaded"])
-                teacher_cu = float(ep.loc[ep_id, "cu_utilized"])
-
-                assign = cap_preds[i, :n].cpu().numpy().astype(int)
-                assign = np.where(assign == DEFER_LABEL, DEFERRED, assign)
-
-                rows.append(
-                    episode_report(ep_id, assign, cu, caps, teacher_n, teacher_cu)
-                )
-                latency.append(latency_ms / n_eps)
-
-            cursor += n_eps
-
+    """Episode-level report vs teacher using the shared src/modeling metrics."""
+    model_metrics, greedy_metrics = evaluate_split(
+        val_ds.episodes, val_ds.arrays, val_logits, val_ds.classes, policy
+    )
+    latency = measure_latency(val_ds.episodes, val_ds.arrays, val_logits, policy)
     return {
-        "model": aggregate_operational(rows, latency),
-        "greedy": aggregate_operational(*greedy_report(val_ds.df, episodes)),
+        "model": {**model_metrics, "latency": latency},
+        "greedy": {**greedy_metrics, "latency": latency},
     }
 
 
@@ -315,10 +260,16 @@ def train_attention(
     run_name: str,
 ) -> dict:
     import warnings
+    import os
+    import tempfile
+
+    import mlflow
+
     warnings.filterwarnings("ignore")
 
-    train_ds = EpisodeDataset(train_df, episodes)
-    val_ds = EpisodeDataset(val_df, episodes)
+    classes = derive_classes(train_df)
+    train_ds = EpisodeDataset(train_df, classes)
+    val_ds = EpisodeDataset(val_df, classes, train_ds.scaler)
 
     train_loader = DataLoader(
         train_ds, batch_size=batch_size, shuffle=True, collate_fn=collate_episodes
@@ -328,9 +279,11 @@ def train_attention(
     )
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = AttentionModel(
-        n_canton=train_ds.n_canton,
-        n_clase=train_ds.n_clase,
+    ep0 = train_ds.episodes[0]
+    model = PairwiseAttentionModel(
+        vehicle_dim=ep0.vehicle.shape[1],
+        truck_dim=ep0.truck.shape[1],
+        context_dim=len(ep0.context),
         d_model=d_model,
         nhead=nhead,
         num_layers=num_layers,
@@ -353,10 +306,10 @@ def train_attention(
         for batch in train_loader:
             batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
             logits = model(batch)
-
             labels = batch["labels"]
+            n_classes = logits.shape[-1]
             loss = F.cross_entropy(
-                logits.reshape(-1, MAX_TRUCKS + 1),
+                logits.reshape(-1, n_classes),
                 labels.reshape(-1),
                 ignore_index=-100,
             )
@@ -389,7 +342,6 @@ def train_attention(
             for batch in val_loader:
                 batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
                 logits = model(batch)
-
                 labels = batch["labels"]
                 mask = labels != -100
 
@@ -417,10 +369,6 @@ def train_attention(
     best_idx = int(np.argmax([m["def_f1"] for m in val_metrics]))
     best = val_metrics[best_idx]
     print(f"\nBest val_def_f1={best['def_f1']:.4f} at epoch {best_idx+1}")
-
-    # Evaluate best model with capacity masking
-    best_ckpt = {k: v for k, v in model.state_dict().items()}
-    model.load_state_dict(best_ckpt)
 
     model.eval()
     cap_correct = 0
@@ -457,12 +405,14 @@ def train_attention(
     cap_def_f1 = 2 * cap_def_prec * cap_def_rec / (cap_def_prec + cap_def_rec) if (cap_def_prec + cap_def_rec) > 0 else 0.0
     print(f"Capacity-aware:   val_acc={cap_acc:.4f}  val_def_f1={cap_def_f1:.4f}")
 
-    import mlflow
-    import tempfile
-    import os
-
+    with torch.no_grad():
+        val_logits_by_ep = _episode_logits_batched(model, val_loader, device)
+    val_logits = stack_episode_logits(
+        val_ds.episodes, val_ds.arrays, _logits_by_index(val_ds.episodes, val_logits_by_ep)
+    )
+    policy = select_policy(val_ds.episodes, val_ds.arrays, val_logits, len(classes))
     operational = attention_operational_report(
-        model, val_loader, val_ds, episodes, device
+        model, val_loader, val_ds, device, policy, val_logits
     )
 
     with mlflow.start_run(run_name=run_name):
@@ -475,13 +425,14 @@ def train_attention(
             "att_batch_size": batch_size,
             "att_learning_rate": learning_rate,
             "att_n_epochs": n_epochs,
-            "att_n_canton": train_ds.n_canton,
-            "att_n_clase": train_ds.n_clase,
+            "att_truck_axis": "dynamic (any T)",
+            "att_canonical": "fleet by capacity desc; 0=SIN_CAMION, 1..T",
         })
         mlflow.log_metric("att_val_accuracy", best["acc"])
         mlflow.log_metric("att_val_defer_f1", best["def_f1"])
         mlflow.log_metric("att_cap_accuracy", cap_acc)
         mlflow.log_metric("att_cap_defer_f1", cap_def_f1)
+        mlflow.log_param("att_decoder_policy", policy)
 
         for epoch, (tm, vm) in enumerate(zip(train_epochs, val_metrics), start=1):
             mlflow.log_metric("att_train_loss", tm["loss"], step=epoch)
@@ -494,13 +445,16 @@ def train_attention(
                 if isinstance(v, dict):
                     for sub_k, sub_v in v.items():
                         mlflow.log_metric(f"att_{agg}_{k}_{sub_k}", sub_v)
-                else:
+                elif isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(v, bool):
                     mlflow.log_metric(f"att_{agg}_{k}", v)
 
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "model.pt")
-            torch.save({"model_state_dict": model.state_dict(), "n_canton": train_ds.n_canton, "n_clase": train_ds.n_clase}, path)
+            torch.save(_attention_checkpoint(model, classes, ep0, d_model, nhead, num_layers, dropout), path)
             mlflow.log_artifact(path, "model")
+
+        _save_attention_artifact(model, classes, ep0, train_ds.scaler, train_ds.arrays.max_trucks,
+                                 d_model, nhead, num_layers, dropout)
 
     return {
         "att_results": {
@@ -509,7 +463,51 @@ def train_attention(
             "att_cap_accuracy": cap_acc,
             "att_cap_defer_f1": cap_def_f1,
             "att_operational": operational,
+            "att_decoder_policy": policy,
             "run_id": run_id,
         },
         "att_predictions": _attention_predictions_df(cap_labels_all, cap_preds_all),
     }
+
+
+def _attention_checkpoint(model, classes, ep0, d_model, nhead, num_layers, dropout) -> dict:
+    """Serializable state for the pairwise attention model."""
+    return {
+        "model_state_dict": model.state_dict(),
+        "model_config": {
+            "vehicle_dim": ep0.vehicle.shape[1],
+            "truck_dim": ep0.truck.shape[1],
+            "context_dim": len(ep0.context),
+            "d_model": d_model,
+            "nhead": nhead,
+            "num_layers": num_layers,
+            "dropout": dropout,
+        },
+        "classes": classes,
+    }
+
+
+def _save_attention_artifact(model, classes, ep0, scaler, max_trucks, d_model, nhead,
+                             num_layers, dropout) -> None:
+    """Persist the attention checkpoint + preprocessing schema next to the GBTs."""
+    from pathlib import Path
+
+    out = Path(__file__).resolve().parents[5] / "artifacts" / "fleet_loading" / "attention"
+    out.mkdir(parents=True, exist_ok=True)
+    import json
+
+    torch.save(_attention_checkpoint(model, classes, ep0, d_model, nhead, num_layers, dropout),
+               out / "model.pt")
+    with open(out / "pairwise_schema.json", "w", encoding="utf-8") as fh:
+        json.dump(
+            {
+                "classes": classes,
+                "max_trucks_padding": int(max_trucks),
+                "blocks": scaler.to_dict(),
+                "model_config": _attention_checkpoint(model, classes, ep0, d_model, nhead,
+                                                      num_layers, dropout)["model_config"],
+            },
+            fh,
+            indent=2,
+            ensure_ascii=False,
+        )
