@@ -1,0 +1,16 @@
+== Protocolo VIEJO: GroupShuffleSplit aleatorio ==
+  [aleatorio (viejo)] filas de opción train=1,491,865
+== Protocolo NUEVO: holdout temporal ==
+  [temporal (nuevo)] filas de opción train=1,557,690
+
+==============================================================================
+XGBoost, mismos hiperparámetros, misma semilla. Solo cambia la partición.
+==============================================================================
+protocolo            aleatorio (viejo)  temporal (nuevo)
+episodios_val               6,968.0000        4,030.0000
+exactitud_cruda                 0.7987            0.8098
+iguala_al_maestro_%            97.4885           96.9231
+brecha_conteo                   0.0258            0.0323
+f1_macro                        0.7703            0.7758
+violacion_capacidad             0.0000            0.0000
+greedy_iguala_%                87.2704           87.4194
