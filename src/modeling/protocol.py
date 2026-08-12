@@ -14,7 +14,7 @@ Hasta ahora había dos protocolos distintos conviviendo:
 
 Las cifras de ambos se publicaron en la misma tabla comparativa, que por tanto
 no compara lo mismo. El propio equipo lo había detectado (ver
-`docs/tarea4/08_comparabilidad_cinco_modelos.md`) sin llegar a unificarlo.
+`docs/decisiones/03_comparabilidad.md`) sin llegar a unificarlo.
 
 Se unifica en la partición **temporal**, y no al revés, por dos razones:
 

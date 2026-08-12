@@ -40,6 +40,20 @@ jobs:
       - run: uv sync --frozen
       - run: uv run pytest -q
 
+  docs:
+    name: Documentación sin referencias muertas
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - run: uv sync --frozen --extra docs
+      # --strict falla ante cualquier enlace roto o página fuera del nav. Es lo
+      # que impide que la documentación vuelva a describir un repositorio que ya
+      # no existe: antes eso solo se detectaba leyendo.
+      - run: uv run mkdocs build --strict
+
   lock:
     name: uv.lock al día
     runs-on: ubuntu-latest

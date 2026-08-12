@@ -1,7 +1,7 @@
 # config/mlp.yaml
 #
 # Hiper-parámetros del clasificador MLP compartido por par (vehículo, camión).
-# La justificación de cada valor está en docs/tarea4/02_seccion_VI_D_mlp.md.
+# La justificación de cada valor está en docs/modelo/arquitectura_mlp.md.
 #
 # Todos son valores INICIALES salvo los que la búsqueda de la Fase 5 haya
 # confirmado; el archivo de métricas registra cuál fue cuál.

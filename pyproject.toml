@@ -7,7 +7,7 @@ requires-python = ">=3.12,<3.13"
 # Pinned because the report (Sec. VI) claims specific versions and because
 # TensorFlow 2.21 -- the Keras 3 backend -- only publishes wheels up to
 # CPython 3.13. The system interpreter here is 3.14, on which `pip install
-# tensorflow` fails outright. See docs/tarea4/05_hallazgos_para_el_equipo.md.
+# tensorflow` fails outright. See docs/decisiones/01_hallazgos_transversales.md.
 dependencies = [
     "keras>=3.15,<3.16",
     "tensorflow>=2.21,<2.22",

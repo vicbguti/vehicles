@@ -258,7 +258,7 @@ def main() -> None:
     # --- 3. Ablación: ¿aporta el MLP, o basta el decodificador? ---------------
     # Sustituye las puntuaciones por ceros y deja actuar sólo al decodificador,
     # sobre los mismos episodios de prueba. Separa lo que aporta el modelo de lo
-    # que aporta la restricción de capacidad. Ver docs/tarea4/03_resultados_mlp.md.
+    # que aporta la restricción de capacidad. Ver docs/modelo/resultados.md.
     ablation = aggregate(
         evaluate_model(
             episodes["test"],

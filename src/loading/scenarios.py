@@ -87,7 +87,7 @@ def generate_fleet(rng: random.Random) -> list[float]:
     # "CAMION_1" names whichever truck the RNG happened to emit first -- a fact
     # that is not among the model's inputs and therefore cannot be learned.
     # Sorting consumes no randomness, so every other episode field is unchanged.
-    # See docs/tarea4/06_canonicalizacion_y_etiquetado.md sections 2 and 6.
+    # See docs/modelo/canonicalizacion.md sections 2 and 6.
     return sorted(caps)
 
 

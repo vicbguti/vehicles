@@ -2,7 +2,7 @@
 """Genera el dataset con la flota ORDENADA antes de etiquetar, a un directorio aparte.
 
 Es la verificación del parche propuesto para `src/loading/scenarios.py`
-(ver `docs/tarea4/06_canonicalizacion_y_etiquetado.md`). En vez de aplicar el
+(ver `docs/modelo/canonicalizacion.md`). En vez de aplicar el
 parche al repositorio -- lo que invalidaría los modelos ya entrenados por el
 equipo -- se monkeypatchea `generate_fleet` aquí y se mide el efecto.
 

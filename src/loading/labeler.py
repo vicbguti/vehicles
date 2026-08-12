@@ -20,8 +20,8 @@ this strict priority order:
     2. total CU utilized across all trucks (tie-breaker among solutions
        that load the same number of vehicles)
 
-This mirrors the objective stated in the course project (Tarea #3, Sec. I):
-maximize vehicles transported, then maximize space utilization.
+The objective is lexicographic: maximize vehicles transported, then maximize
+space utilization.
 
 Design notes
 ------------

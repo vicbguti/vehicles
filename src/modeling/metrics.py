@@ -224,7 +224,7 @@ def label_ceilings(
     Ambas cotas son **invariantes a la canonicalización**: renombrar los camiones
     permuta el eje `t`, y ni `max_t` ni `Σ_t n²` cambian con una permutación. Es
     la demostración formal de que canonicalizar **no puede** subir el techo de
-    exactitud -- lo que arregla es otra cosa (ver `docs/tarea4/06_*.md`).
+    exactitud -- lo que arregla es otra cosa (ver `docs/modelo/canonicalizacion.md`).
 
     Parámetros
     ----------

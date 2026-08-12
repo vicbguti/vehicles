@@ -1,8 +1,11 @@
-site_name: Fleet Loading
-site_description: Supervised imitation learning for capacitated fleet loading
+site_name: Carga de flota
+site_description: Asignación vehículo-camión por aprendizaje supervisado por imitación
 repo_url: https://github.com/vicbguti/vehicles
+docs_dir: docs
+
 theme:
   name: material
+  language: es
   palette:
     primary: indigo
   features:
@@ -11,27 +14,138 @@ theme:
     - navigation.indexes
     - toc.follow
 
+# Falla el build ante cualquier enlace roto. Es la pieza que impide que la
+# documentación vuelva a describir un repositorio que ya no existe: hasta ahora
+# eso solo se detectaba leyendo, y por eso se acumularon 26 avisos.
+strict: true
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+
 nav:
-  - Home: index.md
-  - Problem:
-    - Overview: proposals/01_problem.md
-    - Scope: proposals/02_scope.md
-  - Data:
-    - Description: proposals/03_data.md
-    - Feature coverage: proposals/08_feature_coverage.md
-    - Scenarios coverage: proposals/09_scenarios_coverage.md
-  - Method:
-    - Approach: proposals/04_method.md
-    - Feasibility: proposals/06_feasibility.md
-  - Evaluation: proposals/05_evaluation.md
-  - Operational metrics: metrics.md
-  - Kedro pipeline: kedro.md
-  - Tarea 4 (MLP):
-    - Overview: tarea4/README.md
-    - Results: tarea4/03_resultados_mlp.md
-    - Label canonicalization: tarea4/06_canonicalizacion_y_etiquetado.md
-    - Findings for team: tarea4/05_hallazgos_para_el_equipo.md
-    - Model comparability: tarea4/08_comparabilidad_cinco_modelos.md
+  - Inicio: index.md
+  - El sistema:
+    - "Estructura del código": estructura.md
+    - "Datos": datos.md
+    - "Configuración": configuracion.md
+    - "Git LFS (obligatorio)": git_lfs.md
+  - El modelo:
+    - "Arquitectura del MLP": modelo/arquitectura_mlp.md
+    - "Canonicalización y etiquetado": modelo/canonicalizacion.md
+    - "Resultados": modelo/resultados.md
+    - "Métricas operativas": metricas.md
+    - "Pipeline Kedro": pipeline_kedro.md
+  - Decisiones de ingeniería:
+    - "Hallazgos transversales": decisiones/01_hallazgos_transversales.md
+    - "Orden de la flota": decisiones/02_orden_de_flota.md
+    - "Comparabilidad entre modelos": decisiones/03_comparabilidad.md
+    - "Protocolo de partición": decisiones/04_protocolo_de_particion.md
+  - Perfilado y reportes:
+    - "Perfilado del dataset": perfilado.md
+    - "Generación de reportes": reportes.md
+    - "Auditorías de datos": auditorias.md
+    - "Deduplicación": deduplicacion.md
+    - "Análisis":
+      - "Matriculaciones totales": analisis/registrations/totals.md
+      - "Matriculaciones sin Guayas": analisis/registrations/without_guayas.md
+      - "Subclase y tipo": analisis/subclass_type/overview.md
+  - Propuesta:
+    - propuesta/README.md
+    - "Problem": propuesta/01_problem.md
+    - "Data": propuesta/03_data.md
+    - "Evaluation": propuesta/05_evaluation.md
+    - "Episode & Labeler Feasibility": propuesta/06_feasibility.md
+    - "Vehicle Feature Coverage": propuesta/08_feature_coverage.md
+    - "Scenarios Coverage": propuesta/09_scenarios_coverage.md
+    - "Diferido (ruteo, DRL)":
+      - propuesta/deferred/README.md
+      - "Why Training is Computationally Feasible": propuesta/deferred/feasibility.md
+      - "Learning‑Based Approaches for Fleet Routing": propuesta/deferred/learning_algorithms.md
+      - "Pointer Network & Sequential Route Construction": propuesta/deferred/route_construction.md
+      - "Mathematical Proof of Case 3 Routing Optimality": propuesta/deferred/routing_proof.md
+      - "NP-Hard Fleet Logistics & Vehicle Distribution": propuesta/deferred/runtime.md
+      - "NP-Hard Fleet Logistics & Vehicle Distribution": propuesta/deferred/training.md
+      - "Training Scale & Compute Budget": propuesta/deferred/training_scale.md
+      - "Assuring Model Quality Over Greedy & Status Quo Baselines": propuesta/deferred/validation.md
+      - "Why a Dedicated Deep Learning Model is Required": propuesta/deferred/why_dl_model.md
+      - "Teoría":
+        - propuesta/deferred/theory/README.md
+        - "Espacio de búsqueda":
+          - propuesta/deferred/theory/1_search_space/README.md
+          - "Scenario Parameters": propuesta/deferred/theory/1_search_space/1_scenario_parameters.md
+          - "Subset Selection Space": propuesta/deferred/theory/1_search_space/2_subset_selection.md
+          - "Capacity Constraints and Bounds Proof": propuesta/deferred/theory/1_search_space/3_capacity_constraints.md
+          - "Feasibility of Subset Sizes": propuesta/deferred/theory/1_search_space/4_size_feasibility.md
+          - "Partition Feasibility for N = 16": propuesta/deferred/theory/1_search_space/5_partition_feasibility.md
+          - "Solver Search Walkthrough (Pruning Example)": propuesta/deferred/theory/1_search_space/6_search_walkthrough.md
+          - "Mathematical Complexity of the Search Space": propuesta/deferred/theory/1_search_space/7_complexity.md
+          - "Mathematical Intractability of Fleet Routing": propuesta/deferred/theory/1_search_space/8_intractability.md
+        - "Generalización":
+          - propuesta/deferred/theory/2_generalization/README.md
+          - "Espacio de búsqueda":
+            - propuesta/deferred/theory/2_generalization/1_search_space/README.md
+            - "General Mathematical Formulation (Multi-Class)": propuesta/deferred/theory/2_generalization/1_search_space/formulation.md
+            - "Subset Selection Generalization": propuesta/deferred/theory/2_generalization/1_search_space/subset_selection.md
+          - "Restricciones":
+            - propuesta/deferred/theory/2_generalization/2_constraints/README.md
+            - "Generalized Capacity Bounds": propuesta/deferred/theory/2_generalization/2_constraints/capacity_bounds.md
+            - "Vector Space Behavior and Search Space Pruning": propuesta/deferred/theory/2_generalization/2_constraints/search_space_pruning.md
+            - "Generalized Selection Intervals (Pool Intersection)": propuesta/deferred/theory/2_generalization/2_constraints/selection_intervals.md
+          - "Particionado":
+            - propuesta/deferred/theory/2_generalization/3_partitioning/README.md
+            - "Bin Packing Generalization": propuesta/deferred/theory/2_generalization/3_partitioning/bin_packing.md
+            - "Matrix Representation and Search Construction": propuesta/deferred/theory/2_generalization/3_partitioning/matrix_search.md
+        - "Límites de cómputo":
+          - "Physical Limits of Routing Computation": propuesta/deferred/theory/3_compute_limits/limits.md
+    - "Caso de estudio":
+      - propuesta/example/README.md
+      - "Problema":
+        - propuesta/example/problem/README.md
+        - "Vehicle Capacity Constraints & Capacity Units (CUs)": propuesta/example/problem/constraints.md
+        - "Heuristic Failure Modes (Case 1 vs. Case 2)": propuesta/example/problem/failures.md
+        - "NP-Hard Fleet Logistics & Vehicle Distribution": propuesta/example/problem/scenario.md
+        - "Greedy":
+          - "Case 2: Naive Greedy Routing & Backtracking": propuesta/example/problem/2_greedy/greedy.md
+        - "Status quo":
+          - "Case 1: Manual Status Quo Allocation": propuesta/example/problem/3_status_quo/status_quo.md
+      - "Solución":
+        - propuesta/example/solution/README.md
+        - "Concrete Examples of the Combinations": propuesta/example/solution/comparisons.md
+        - "Óptimo":
+          - "Case 3: Globally Optimized Solution (ML Output)": propuesta/example/solution/4_optimized/optimized.md
+    - "Solución":
+      - propuesta/solution/README.md
+      - "Visualizaciones":
+        - propuesta/solution/visuals/README.md
+        - "Espaciales":
+          - "Vehicle Class Distribution": propuesta/solution/visuals/spatial/class_distribution.md
+          - "Geographic Canton Demands": propuesta/solution/visuals/spatial/geographic_demands.md
+        - "Temporales":
+          - "Temporal Demand Trends": propuesta/solution/visuals/temporal/temporal_trends.md
+          - "Temporal Demand Trends Per Vehicle Class": propuesta/solution/visuals/temporal/temporal_trends_class.md
+          - "Combined Temporal Demand Trends": propuesta/solution/visuals/temporal/temporal_trends_combined.md
+          - "Temporal Demand Trends Per Location": propuesta/solution/visuals/temporal/temporal_trends_location.md
+  - Entrega:
+    - entrega/index.md
+    - "Tabla V — caso de uso de análisis": entrega/tabla_v_caso_uso.md
+    - "Anexo — uso de herramientas de IA": entrega/anexo_uso_de_ia.md
+  - Histórico:
+    - "Alcance original (superado)": historico/02_alcance_original.md
+    - "Método original (superado)": historico/04_metodo_original.md
+    - "Emparejamiento semántico (propuesta descartada)":
+      - "Problema": historico/emparejamiento_semantico/problem.md
+      - "Solución": historico/emparejamiento_semantico/solution.md
+      - "Especificaciones": historico/emparejamiento_semantico/specifications.md
+      - "Caso de estudio":
+        - "Escenario": historico/emparejamiento_semantico/example/scenario.md
+        - "Status quo": historico/emparejamiento_semantico/example/status_quo.md
+        - "Comparaciones": historico/emparejamiento_semantico/example/comparisons.md
+        - "Complejidad": historico/emparejamiento_semantico/example/complexity.md
+        - "Óptimo": historico/emparejamiento_semantico/example/optimized.md
+        - "Tiempo de ejecución": historico/emparejamiento_semantico/example/runtime.md
+        - "Entrenamiento": historico/emparejamiento_semantico/example/training.md
 
 extra:
   social:
@@ -44,3 +158,4 @@ markdown_extensions:
   - pymdownx.tabbed
   - admonition
   - footnotes
+  - tables

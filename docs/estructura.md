@@ -1,0 +1,57 @@
+# Estructura del código
+
+El repositorio mezcla tres generaciones de código que se están reconciliando:
+el andamiaje inicial de ingesta y perfilado, el núcleo de modelado, y el
+pipeline Kedro que consume ese núcleo.
+
+## `src/loading/` — el maestro exacto
+
+La verdad de referencia de todo el proyecto. No es un modelo: es una búsqueda
+exacta que calcula el óptimo con el que se entrenan los cuatro modelos.
+
+| Módulo | Qué hace |
+|---|---|
+| `labeler.py` | Programación dinámica sobre enteros escalados con `fractions.Fraction`, sin solvers externos. Maximiza en orden lexicográfico: primero cuántos vehículos se cargan, después cuánta capacidad se aprovecha |
+| `scenarios.py` | Construye los episodios (cantón, semana ISO) y genera la flota. Ordena las capacidades antes de etiquetar — ver [canonicalización](modelo/canonicalizacion.md) |
+
+Cubierto por 325 pruebas validadas por mutación: se comprobó que fallan ante
+regresiones deliberadas, no solo que pasan en verde.
+
+## `src/modeling/` — el núcleo compartido
+
+Todo lo que los cuatro modelos tienen en común. Ningún modelo reimplementa nada
+de esto.
+
+| Módulo | Qué hace |
+|---|---|
+| `canonicalization.py` | Reindexa la flota por capacidad descendente. `CAMION_1` significa «el camión más grande», no «el que salió primero del generador» |
+| `features.py` | Tensores por par `(vehículo, camión)`. Excluye deliberadamente `canton`, `uid`, `truck_id` y la posición dentro de la clase: solo permitirían memorizar |
+| `capacity_decoder.py` | `decode_episode` — decodificador voraz que respeta la capacidad. El plan es factible por construcción: un vehículo solo se coloca si cabe |
+| `metrics.py` | Métricas por episodio contra el maestro exacto, más la línea base greedy |
+| `dataset.py` | Carga de episodios y `assert_no_episode_leakage` |
+| `protocol.py` | **El único sitio donde se construye una partición.** Holdout temporal compartido por los cuatro modelos |
+| `mlp_classifier.py` | El MLP en Keras |
+
+## `src/pipeline/` y `src/profiler/` — ingesta y perfilado
+
+Heredados del análisis inicial del dataset del SRI. `pipeline/` limpia y
+deduplica los CSV; `profiler/` calcula completitud, unicidad, deriva de esquema
+y métricas físicas de almacenamiento.
+
+## `fleet_loading/` — el pipeline Kedro
+
+XGBoost, LightGBM y el transformer. Consume los tensores canónicos de
+`src/modeling` mediante un parche de `sys.path`, que desaparecerá al empaquetar
+el proyecto. Detalle en [pipeline Kedro](pipeline_kedro.md).
+
+## `scripts/` — entradas de línea de comandos
+
+`build_vehicle_features.py`, `build_scenarios.py`, `train_mlp.py`,
+`evaluate_mlp.py`, `sweep_mlp.py`, `label_ceiling.py`,
+`teacher_self_agreement.py`, `build_extrapolation_set.py`,
+`evaluate_fleet_loading.py`, `compare_split_protocols.py`, y los tres
+orquestadores del perfilado y los reportes (`run_pipeline.py`,
+`run_profiling.py`, `run_reporting.py`).
+
+Cada uno añade la raíz del repositorio a `sys.path`, porque hoy no hay nada
+instalable. Es deuda conocida.
