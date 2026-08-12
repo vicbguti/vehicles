@@ -21,10 +21,20 @@ dependencies = [
     "openpyxl>=3.1",
 ]
 
+# El sitio MkDocs se declaraba en ninguna parte pese a que docs/index.md manda
+# ejecutar `mkdocs serve`. Como extra opcional no lastra el entorno de trabajo.
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6,<2",
+    "mkdocs-material>=9.5,<10",
+    "pymdown-extensions>=10",
+]
+
 [dependency-groups]
 dev = [
-    "pytest>=8.3",
-    "ruff>=0.9",
+    "pytest>=8.3,<10",
+    "ruff>=0.16,<0.17",
+    "pre-commit>=4,<5",
 ]
 
 [tool.uv]
@@ -56,6 +66,13 @@ extend-exclude = [
     "fleet_loading",
     "notebooks",
 ]
+
+[tool.ruff.format]
+# Ruff >=0.16 también formatea los bloques de código Python embebidos en
+# Markdown. Aquí eso es dañino: `chat/` son transcripciones de sesiones de IA
+# que se entregan como evidencia del curso y no deben reescribirse, y los
+# ejemplos de docs/ usan alineación deliberada con fines pedagógicos.
+exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
