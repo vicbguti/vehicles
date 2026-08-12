@@ -1,4 +1,4 @@
-# Hallazgos para el equipo — Tarea #4
+# Hallazgos que afectan a los cinco modelos
 
 > **Documento interno. No va al reporte.**
 > Autor: Juan Francisco Fernández Ramos · 25 de julio de 2026
@@ -163,9 +163,9 @@ Las dejo listadas; no son mías para arreglar solo.
 | Dónde | Dice | Realidad |
 |---|---|---|
 | `docs/historico/04_metodo_original.md` | El modelo estudiante se implementa en **PyTorch** | La planificación y la sección VI del reporte dicen **Keras 3**. Yo usé Keras 3.15 con backend TensorFlow 2.21. |
-| Reporte, Sec. VI | Polars 1.42, PyArrow 24.0, `uv` con bloqueo de versiones | El repo usaba `requirements.txt` sin versiones y pandas. Añadí `pyproject.toml` + `uv.lock` (aditivo, `requirements.txt` sigue ahí). PyArrow resuelto es 25.0. El pipeline sigue en pandas: si queremos afirmar Polars, hay que migrarlo o corregir el texto. |
+| Reporte, Sec. VI | Polars 1.42, PyArrow 24.0, `uv` con bloqueo de versiones | El repo usaba `requirements.txt` sin versiones y pandas. Añadí `pyproject.toml` + `uv.lock`; **`requirements.txt` ya se eliminó**, hay un solo manifiesto. PyArrow resuelto es 25.0. El pipeline sigue en pandas: si queremos afirmar Polars, hay que migrarlo o corregir el texto. |
 | Reporte, Sec. VI | Python 3.12 | Correcto, pero el intérprete del sistema es 3.14 y **TensorFlow no publica ruedas para 3.14**. **Resuelto:** `.python-version` fija 3.12, así que `uv sync` elige el intérprete solo. |
-| `05_evaluation.md` | *"(To be filled after `scripts/eval_loading.py` runs)"* | Ese script no existe. Yo hice `scripts/evaluate_mlp.py` para mi modelo; los resultados de los cinco siguen sin consolidar. |
+| `05_evaluation.md` | *"(To be filled after `scripts/eval_loading.py` runs)"* | Ese script nunca existió. **Resuelto:** la evaluación la hacen `scripts/evaluate_mlp.py` y el pipeline Kedro, y los cinco modelos ya están consolidados en una sola tabla — ver [inicio](../index.md). |
 
 ---
 

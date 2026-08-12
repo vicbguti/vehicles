@@ -1,7 +1,11 @@
-# Tarea #4 — Entregables de Juan Francisco Fernández Ramos
+# Entregables y su destino en el reporte IEEE
 
-Índice de lo producido para la Tarea #4, con su destino en el reporte del grupo
-(el Google Doc en formato IEEE).
+Índice de lo producido por Juan Francisco Fernández Ramos y dónde va cada cosa
+en el reporte del grupo (el Google Doc en formato IEEE).
+
+Esta es la única página que se acopla a la entrega del curso, y a propósito: su
+contenido **es** esa trazabilidad. El resto del repositorio no menciona números
+de tarea en ninguna ruta, nombre de carpeta ni comentario de código.
 
 | Archivo | Qué es | Dónde va |
 |---|---|---|
