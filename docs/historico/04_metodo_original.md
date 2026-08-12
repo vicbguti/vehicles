@@ -1,4 +1,13 @@
-# Method
+# Método original (superado)
+
+!!! warning "Diseño superado — se conserva como historia de la propuesta"
+    Describe la formulación inicial: **dos camiones** de 6,0 CU fijos y un
+    modelo en PyTorch en archivos que nunca llegaron a existir. La formulación
+    vigente no fija el número de camiones: los modelos emiten logits
+    `(V, 1 + T)` para cualquier `T`.
+
+    Ver [pipeline Kedro](../pipeline_kedro.md) y
+    [canonicalización](../modelo/canonicalizacion.md).
 
 ## Problem formulation
 

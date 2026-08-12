@@ -1,3 +1,7 @@
+# ruff: noqa: E501
+# Las líneas largas de este archivo son contenido Markdown dentro de literales:
+# filas de tabla y párrafos del reporte que genera. Partirlas por el límite de
+# 100 columnas cambiaría el documento de salida, no solo el código fuente.
 #!/usr/bin/env python3
 """Profile SRI episode sizes for fleet-loading label feasibility.
 
@@ -13,7 +17,7 @@ from __future__ import annotations
 
 import argparse
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -76,7 +80,9 @@ def threshold_table(series: pd.Series, thresholds: tuple[int, ...]) -> list[str]
     return lines
 
 
-def best_loading_dfs(cu_weights: list[float], capacity: float = TRUCK_CAPACITY) -> tuple[int, float]:
+def best_loading_dfs(
+    cu_weights: list[float], capacity: float = TRUCK_CAPACITY
+) -> tuple[int, float]:
     """Pruned DFS: max vehicles loaded on 2 trucks (no defer required in scoring)."""
     n = len(cu_weights)
     best_loaded = 0
@@ -126,19 +132,21 @@ def benchmark_labeler() -> list[str]:
     loaded, util = best_loading_dfs(weights10)
     ms = (time.perf_counter() - t0) * 1000
 
-    lines.extend([
-        "",
-        "### Sample timing (pruned DFS, development prototype)",
-        "",
-        "Method: depth-first search with capacity pruning in `episode_feasibility.py`.",
-        "A production labeler in `src/loading/labeler.py` should use tighter bounds (see deferred theory docs).",
-        "",
-        f"- **N=10** (6 sedans + 4 SUVs): {loaded} vehicles loaded, {util:.2f} CU total, **{ms:.2f} ms**",
-        "- **N=15–20:** not timed here — requires optimized labeler before batch labeling.",
-        "",
-        "**Status:** exhaustive labeling at N≤20 is *expected* tractable with a proper solver; **not yet implemented** for batch runs.",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "### Sample timing (pruned DFS, development prototype)",
+            "",
+            "Method: depth-first search with capacity pruning in `episode_feasibility.py`.",
+            "A production labeler in `src/loading/labeler.py` should use tighter bounds (see deferred theory docs).",
+            "",
+            f"- **N=10** (6 sedans + 4 SUVs): {loaded} vehicles loaded, {util:.2f} CU total, **{ms:.2f} ms**",
+            "- **N=15–20:** not timed here — requires optimized labeler before batch labeling.",
+            "",
+            "**Status:** exhaustive labeling at N≤20 is *expected* tractable with a proper solver; **not yet implemented** for batch runs.",
+            "",
+        ]
+    )
     return lines
 
 
@@ -172,7 +180,7 @@ def analyze_years(years: list[int] | None) -> str:
     national_all = pd.concat(national_weekly_parts)
     canton_all = pd.concat(canton_weekly_parts) if canton_weekly_parts else pd.Series(dtype=int)
 
-    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    generated = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     years_label = ", ".join(str(y) for y in years) if years else "all available years"
 
     lines = [
@@ -238,69 +246,79 @@ def analyze_years(years: list[int] | None) -> str:
     ]
 
     if len(canton_all):
-        lines.extend([
-            f"- Episodes: **{len(canton_all):,}**",
-            f"- Median N: **{canton_all.median():.0f}**",
-            f"- 90th percentile: **{canton_all.quantile(0.9):.0f}**",
-            "",
-            "| Threshold | Episodes | % |",
-            "|-------------|----------|---|",
-            *threshold_table(canton_all, THRESHOLDS),
-            "",
-            "**Finding:** ~half of canton-weeks have N ≤ 15; ~60% have N ≤ 20. High **volume** of naturally small episodes.",
-        ])
+        lines.extend(
+            [
+                f"- Episodes: **{len(canton_all):,}**",
+                f"- Median N: **{canton_all.median():.0f}**",
+                f"- 90th percentile: **{canton_all.quantile(0.9):.0f}**",
+                "",
+                "| Threshold | Episodes | % |",
+                "|-------------|----------|---|",
+                *threshold_table(canton_all, THRESHOLDS),
+                "",
+                "**Finding:** ~half of canton-weeks have N ≤ 15; ~60% have N ≤ 20. High **volume** of naturally small episodes.",
+            ]
+        )
     else:
         lines.append("*Canton column not found — canton-week stats skipped.*")
 
-    lines.extend([
-        "",
-        "---",
-        "",
-        *benchmark_labeler(),
-        "---",
-        "",
-        "## Volume estimate (if subsampling)",
-        "",
-        "If each national week yields **k** random subsamples of fixed N=18 (stratified by class/canton):",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "---",
+            "",
+            *benchmark_labeler(),
+            "---",
+            "",
+            "## Volume estimate (if subsampling)",
+            "",
+            "If each national week yields **k** random subsamples of fixed N=18 (stratified by class/canton):",
+            "",
+        ]
+    )
 
     weeks_per_year = national_all.groupby(level=0).count().mean() if len(national_all) else 0
     for k in (5, 10, 20):
         lines.append(f"- k={k}: ~{weeks_per_year * k:.0f} episodes/year × years in run")
 
-    lines.extend([
-        "",
-        "Subsampling adds volume but each slice is an arbitrary subset of national flow — see quality notes.",
-        "",
-        "---",
-        "",
-        "## Quality vs toy scenario",
-        "",
-        "| Definition | Volume | Match to [example/problem/scenario.md](./example/problem/scenario.md) |",
-        "|------------|--------|------------------------------------------------------------------------|",
-        "| National week | High | **Poor** — ~7k vehicles/week, not an 18-vehicle port manifest |",
-        "| Canton-week | High (N≤20 common) | **Weak** — single canton, not multi-destination shipment |",
-        "| Subsample N=18 from week | Tunable | **Medium** — real class/canton mix, artificial batch boundary |",
-        "| Toy 18-vehicle case | n=1 | **Exact** — for labeler sanity check only |",
-        "",
-        "**Status:** Episode definition for training is **not finalized**. This report supplies data to choose one.",
-        "",
-        "---",
-        "",
-        "## Open items",
-        "",
-        "- [ ] Pick episode definition and document in [03_data.md](./03_data.md)",
-        "- [ ] Implement `src/loading/labeler.py` and replicate Case 3 in [example/solution/comparisons.md](./example/solution/comparisons.md)",
-        "- [ ] Re-run this script after episode filter (e.g. Guayas-only, class filter) is chosen",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "Subsampling adds volume but each slice is an arbitrary subset of national flow — see quality notes.",
+            "",
+            "---",
+            "",
+            "## Quality vs toy scenario",
+            "",
+            "| Definition | Volume | Match to [example/problem/scenario.md](./example/problem/scenario.md) |",
+            "|------------|--------|------------------------------------------------------------------------|",
+            "| National week | High | **Poor** — ~7k vehicles/week, not an 18-vehicle port manifest |",
+            "| Canton-week | High (N≤20 common) | **Weak** — single canton, not multi-destination shipment |",
+            "| Subsample N=18 from week | Tunable | **Medium** — real class/canton mix, artificial batch boundary |",
+            "| Toy 18-vehicle case | n=1 | **Exact** — for labeler sanity check only |",
+            "",
+            "**Status:** Episode definition for training is **not finalized**. This report supplies data to choose one.",
+            "",
+            "---",
+            "",
+            "## Open items",
+            "",
+            "- [ ] Pick episode definition and document in [03_data.md](./03_data.md)",
+            "- [ ] Implement `src/loading/labeler.py` and replicate Case 3 in [example/solution/comparisons.md](./example/solution/comparisons.md)",
+            "- [ ] Re-run this script after episode filter (e.g. Guayas-only, class filter) is chosen",
+            "",
+        ]
+    )
     return "\n".join(lines)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Profile SRI episode sizes for loading feasibility.")
-    parser.add_argument("--years", type=int, nargs="*", help="Years to include (default: all CSV files)")
+    parser = argparse.ArgumentParser(
+        description="Profile SRI episode sizes for loading feasibility."
+    )
+    parser.add_argument(
+        "--years", type=int, nargs="*", help="Years to include (default: all CSV files)"
+    )
     args = parser.parse_args()
 
     report = analyze_years(args.years)

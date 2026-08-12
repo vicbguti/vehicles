@@ -55,7 +55,7 @@ Use this scenario to **sanity-check** the exhaustive labeler before training.
 
 ## Planned experiments
 
-1. **Temporal holdout** — train on 2017–2024, evaluate on 2025–2026 weeks.
+1. **Temporal holdout** — train on 2018–2024, evaluate on 2025 (test: 2026).
 2. **Size sweep** — N = 10, 20, 30, 50; plot greedy vs model vs timed exhaustive.
 3. **Toy replication** — labeler reproduces Case 3 grouping from case study.
 
@@ -63,4 +63,21 @@ Use this scenario to **sanity-check** the exhaustive labeler before training.
 
 ## Results
 
-*(To be filled after `scripts/eval_loading.py` runs.)*
+These experiments were carried out. The results live in the pages that report
+measurements, not here:
+
+- **Operational metrics** and the model comparison table —
+  [métricas operativas](../metricas.md) and [resultados](../modelo/resultados.md).
+- **Temporal holdout** — implemented in `src/modeling/protocol.py` and shared by
+  all four models. Its measured effect vs. the earlier random split is in
+  [protocolo de partición](../decisiones/04_protocolo_de_particion.md).
+- **Extrapolation beyond the training fleet size** (5–10 trucks) —
+  [inicio](../index.md).
+
+Note that experiment 1 above says 2018, not the 2017 originally planned: the
+2017 CSV has no `FECHA PROCESO` column, so it cannot be placed in time and is
+dropped by `load_all_years`.
+
+The script named in the original proposal (`scripts/eval_loading.py`) was never
+written. Evaluation is done by `scripts/evaluate_mlp.py`,
+`scripts/evaluate_fleet_loading.py` and the Kedro pipeline.

@@ -68,3 +68,17 @@ train-mlp:
 
 evaluate-mlp:
     uv run python scripts/evaluate_mlp.py
+
+# Los tres modelos del pipeline Kedro (XGBoost, LightGBM, transformer).
+#
+# El `--project ..` no es adorno: sin él, uv toma fleet_loading/ como raíz de
+# proyecto propia y crea un entorno virtual aparte. Ver fleet_loading/pyproject.toml.
+train-fleet:
+    cd fleet_loading && uv run --project .. kedro run
+
+# Un solo nodo, sin reentrenar: las figuras son función pura de las predicciones.
+fleet-figures:
+    cd fleet_loading && uv run --project .. kedro run --nodes report_confusion_matrices
+
+mlflow:
+    uv run --extra tracking mlflow ui --backend-store-uri sqlite:///mlflow.db

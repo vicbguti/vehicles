@@ -48,7 +48,7 @@ uv run python scripts/evaluate_mlp.py
 
 # XGBoost, LightGBM y transformer (pipeline Kedro)
 uv sync --extra gbt --extra attention --extra tracking --extra kedro
-cd fleet_loading && uv run kedro run
+cd fleet_loading && uv run --project .. kedro run
 
 # Perfilado y reportes del dataset
 uv run python scripts/run_pipeline.py

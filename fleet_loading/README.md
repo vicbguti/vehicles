@@ -12,13 +12,18 @@ un solo `pyproject.toml` y un solo `uv.lock`.
 
 ```bash
 uv sync --extra gbt --extra attention --extra tracking --extra kedro
-cd fleet_loading && uv run kedro run
+cd fleet_loading && uv run --project .. kedro run
 ```
+
+`--project ..` no es adorno: sin él, `uv` toma este directorio como raíz de
+proyecto propia, crea un entorno virtual aparte con otra versión de Python y
+falla con `Failed to spawn: kedro`. Con `just` instalado, `just train-fleet`
+hace lo mismo sin tener que recordarlo.
 
 Un solo nodo, sin reentrenar:
 
 ```bash
-uv run kedro run --nodes report_confusion_matrices
+uv run --project .. kedro run --nodes report_confusion_matrices
 ```
 
 ## Estructura

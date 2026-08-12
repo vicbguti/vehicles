@@ -1,5 +1,5 @@
 import pandas as pd
-from typing import Dict, Any
+
 
 def get_record_count(df: pd.DataFrame) -> int:
     """
@@ -7,7 +7,8 @@ def get_record_count(df: pd.DataFrame) -> int:
     """
     return len(df)
 
-def profile_temporal_record_counts(dfs: Dict[str, pd.DataFrame]) -> Dict[str, int]:
+
+def profile_temporal_record_counts(dfs: dict[str, pd.DataFrame]) -> dict[str, int]:
     """
     Given a dict of period_label -> DataFrame, returns counts for each period.
     """

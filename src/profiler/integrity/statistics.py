@@ -1,21 +1,23 @@
-import pandas as pd
-import numpy as np
-from typing import Dict, Any
+from typing import Any
 
-def profile_descriptive_statistics(df: pd.DataFrame) -> Dict[str, Any]:
+import numpy as np
+import pandas as pd
+
+
+def profile_descriptive_statistics(df: pd.DataFrame) -> dict[str, Any]:
     """
     Computes statistical properties for numerical columns in the DataFrame.
     """
     stats_profile = {}
-    
+
     # Select numeric columns
     numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
+
     for col in numeric_cols:
         series = df[col].dropna()
         if series.empty:
             continue
-            
+
         stats_profile[col] = {
             "mean": float(series.mean()),
             "median": float(series.median()),
@@ -26,8 +28,8 @@ def profile_descriptive_statistics(df: pd.DataFrame) -> Dict[str, Any]:
             "quantiles": {
                 "25%": float(series.quantile(0.25)),
                 "50%": float(series.quantile(0.50)),
-                "75%": float(series.quantile(0.75))
-            }
+                "75%": float(series.quantile(0.75)),
+            },
         }
-        
+
     return stats_profile

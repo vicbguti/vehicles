@@ -1,4 +1,14 @@
-# Scope
+# Alcance original (superado)
+
+!!! warning "Diseño superado — se conserva como historia de la propuesta"
+    Describe el diseño del 25 de junio de 2025: un asignador en **PyTorch**,
+    **dos camiones** fijos y los archivos `src/loading/assigner.py`,
+    `scripts/train_loading.py` y `scripts/eval_loading.py`, **ninguno de los
+    cuales existe**. El sistema que se construyó es otro: cuatro modelos que
+    puntúan pares `(vehículo, camión)` con eje de camiones dinámico.
+
+    El alcance vigente está en [la propuesta](../propuesta/01_problem.md) y el
+    diseño real en [estructura del código](../estructura.md).
 
 **Last updated:** 2025-06-25
 

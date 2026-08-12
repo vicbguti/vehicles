@@ -1,36 +1,14 @@
-[build-system]
-requires = [
-    "setuptools",
-]
-build-backend = "setuptools.build_meta"
-
-[project]
-requires-python = ">=3.10"
-name = "fleet_loading"
-readme = "README.md"
-dynamic = [
-    "version",
-]
-dependencies = [
-    "ipython>=8.10",
-    "jupyterlab>=3.0",
-    "notebook",
-    "kedro~=1.5.0",
-]
-
-[project.scripts]
-fleet_loading = "fleet_loading.__main__:main"
-
-[project.entry-points."kedro.hooks"]
-
-[tool.setuptools.dynamic.version]
-attr = "fleet_loading.__version__"
-
-[tool.setuptools.packages.find]
-where = [
-    "src",
-]
-namespaces = false
+# Solo metadatos de Kedro. Deliberadamente SIN [project].
+#
+# Antes este archivo declaraba un segundo proyecto (setuptools,
+# requires-python = ">=3.10", que contradecía el "<3.13" de la raíz). El efecto
+# no era teórico: `cd fleet_loading && uv run kedro run` --el comando que
+# documenta el README-- hacía que uv tomara ESTE archivo como raíz del proyecto,
+# creara un entorno virtual aparte con otra versión de Python y fallara con
+# "Failed to spawn: kedro".
+#
+# Sin [project], uv sube hasta el pyproject.toml de la raíz y usa el único
+# entorno del repositorio, que es el que tiene kedro, torch y los GBT.
 
 [tool.kedro]
 package_name = "fleet_loading"

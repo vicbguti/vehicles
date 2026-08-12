@@ -51,6 +51,7 @@ docs = [
 [dependency-groups]
 dev = [
     "pytest>=8.3,<10",
+    "pytest-cov>=5,<8",
     "ruff>=0.16,<0.17",
     "pre-commit>=4,<5",
 ]
@@ -60,6 +61,21 @@ dev = [
 # is nothing to build or install as a distribution.
 package = false
 
+# El transformer se entrena en CPU (batch 128, 50 épocas, ~35 k episodios). Sin
+# fijar el índice, `torch` arrastra las ruedas de CUDA de NVIDIA: varios GB que
+# esta máquina no puede usar --lleva gráficos AMD-- y que en CI serían minutos de
+# descarga en cada ejecución.
+#
+# Si alguien del equipo entrena en una GPU NVIDIA, basta con borrar estos dos
+# bloques; el resto del manifiesto no cambia.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -67,26 +83,27 @@ target-version = "py312"
 # Árbol heredado pendiente de limpiar. Se reduce por etapas: al dejar un
 # directorio en verde se quita de esta lista y no vuelve a entrar.
 #
-# Conteo medido (ruff --no-force-exclude), pendiente ~423:
-#   scripts/reporting  331   <- 73 % del total; buena parte desaparece al borrar
-#                                el árbol muerto de plotting (duplicado)
-#   src/profiler        81
-#   scripts/loading     21
-#   scripts/profiling   14
-#   src/pipeline         5
-#   src/loading          2
+# Conteo medido (ruff --no-force-exclude), pendiente ~360:
+#   scripts/reporting             329   <- 91 % de lo que queda. Buena parte
+#                                          desaparece al borrar el árbol muerto
+#                                          de plotting, que exige poder
+#                                          regenerar las figuras -> bloqueado
+#                                          por data/raw/SRI_Vehiculos_DD.xlsx
+#   scripts/build_vehicle_features.py  13
+#   scripts/build_scenarios.py          8
+#   src/pipeline                        5
+#   scripts/run_*.py                    5
+#   src/loading                         2
 #
-# Ya saneados y fuera de la lista: fleet_loading (31 errores, corregidos aquí).
+# Ya saneados y fuera de la lista: fleet_loading (31), src/profiler (81),
+# scripts/loading (21), scripts/profiling (14).
 extend-exclude = [
     "scripts/reporting",
-    "scripts/profiling",
-    "scripts/loading",
     "scripts/run_pipeline.py",
     "scripts/run_profiling.py",
     "scripts/run_reporting.py",
     "scripts/build_scenarios.py",
     "scripts/build_vehicle_features.py",
-    "src/profiler",
     "src/pipeline",
     "src/loading",
 ]

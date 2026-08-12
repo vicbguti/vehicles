@@ -54,7 +54,7 @@ uv run python scripts/evaluate_mlp.py
 
 # 4. Los otros tres modelos (pipeline Kedro). Necesitan sus extras:
 uv sync --extra gbt --extra attention --extra tracking --extra kedro
-cd fleet_loading && uv run kedro run
+cd fleet_loading && uv run --project .. kedro run
 
 # 5. MLflow (la base está en la raíz del repo, mlflow.db)
 uv run --extra tracking mlflow ui --backend-store-uri sqlite:///mlflow.db

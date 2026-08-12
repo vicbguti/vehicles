@@ -22,7 +22,7 @@ recolorearlas es editar `_confusion_matrix_figure` en `nodes.py` y re-ejecutar
 un solo nodo rápido:
 
 ```bash
-kedro run --nodes report_confusion_matrices
+uv run --project .. kedro run --nodes report_confusion_matrices
 ```
 
 No hace falta reentrenar.
@@ -68,7 +68,7 @@ La maquinaria compartida vive en `pipelines/training/pairwise.py`:
 
 ```bash
 uv sync --extra gbt --extra attention --extra tracking --extra kedro
-cd fleet_loading && uv run kedro run
+cd fleet_loading && uv run --project .. kedro run
 ```
 
 No hay entorno virtual por subproyecto: hay un solo `pyproject.toml` y un solo

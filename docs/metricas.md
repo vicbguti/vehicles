@@ -128,7 +128,7 @@ them never requires retraining — edit `_confusion_matrix_figure` in `nodes.py`
 then:
 
 ```bash
-kedro run --nodes report_confusion_matrices
+uv run --project .. kedro run --nodes report_confusion_matrices
 ```
 
 The report node also overwrites the `confusion_matrix.png` artifact that
