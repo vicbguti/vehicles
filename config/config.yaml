@@ -1,12 +1,17 @@
-# Project Configurations
+# Configuración del pipeline heredado de perfilado y reportes
+# (scripts/profiling/, scripts/reporting/).
+#
+# Solo contiene claves que algún módulo lee de verdad. Se eliminaron `raw_dir`,
+# `processed_dir` (apuntaban a data/raw y data/processed, que no existen) y
+# `features_dir` (cero lectores): las rutas del pipeline de modelado están
+# fijadas en los scripts y se centralizarán al empaquetar el proyecto.
 
 paths:
-  raw_dir: "data/raw"
-  processed_dir: "data/processed"
-  features_dir: "data/features"
   reports_dir: "reports"
 
 data:
+  # OJO: este .xlsx está en .gitignore y no viene en el clon. La etapa
+  # scripts/reporting/proposals/solution_visuals/spatial/geographic_demands.py
+  # es la única que lo usa y falla sin él.
   dictionary: "data/raw/SRI_Vehiculos_DD.xlsx"
   files_pattern: "data/clean/SRI_Vehiculos_Nuevos_*.csv"
-  schema_config: "config/schemas.yaml"

@@ -5,7 +5,7 @@ import pandas as pd
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 from fleet_loading.pipelines.training.pairwise import (
     build_tensors,
@@ -198,9 +198,7 @@ def predict_with_capacity(
 
 
 @torch.no_grad()
-def _episode_logits_batched(
-    model: nn.Module, loader: DataLoader, device
-) -> dict[str, np.ndarray]:
+def _episode_logits_batched(model: nn.Module, loader: DataLoader, device) -> dict[str, np.ndarray]:
     """One batched pass over the loader -> per-episode (V, 1+T) logits, keyed by episode_id."""
     model.eval()
     out = {}
@@ -240,10 +238,12 @@ def attention_operational_report(
 
 def _attention_predictions_df(cap_labels_all, cap_preds_all) -> pd.DataFrame:
     """Combine capacity-aware val predictions into a DataFrame for the report node."""
-    return pd.DataFrame({
-        "y_true": np.concatenate(cap_labels_all),
-        "y_pred": np.concatenate(cap_preds_all),
-    })
+    return pd.DataFrame(
+        {
+            "y_true": np.concatenate(cap_labels_all),
+            "y_pred": np.concatenate(cap_preds_all),
+        }
+    )
 
 
 def train_attention(
@@ -259,9 +259,9 @@ def train_attention(
     n_epochs: int,
     run_name: str,
 ) -> dict:
-    import warnings
     import os
     import tempfile
+    import warnings
 
     import mlflow
 
@@ -304,7 +304,9 @@ def train_attention(
         train_total = 0
 
         for batch in train_loader:
-            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+            batch = {
+                k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()
+            }
             logits = model(batch)
             labels = batch["labels"]
             n_classes = logits.shape[-1]
@@ -340,7 +342,9 @@ def train_attention(
 
         with torch.no_grad():
             for batch in val_loader:
-                batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+                batch = {
+                    k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()
+                }
                 logits = model(batch)
                 labels = batch["labels"]
                 mask = labels != -100
@@ -364,11 +368,14 @@ def train_attention(
         val_metrics.append({"acc": acc, "def_f1": def_f1})
 
         if (epoch + 1) % 10 == 0 or epoch == 0:
-            print(f"Epoch {epoch+1:3d}/{n_epochs}  train_loss={train_loss:.4f}  train_acc={train_acc:.4f}  val_acc={acc:.4f}  val_def_f1={def_f1:.4f}")
+            print(
+                f"Epoch {epoch + 1:3d}/{n_epochs}  train_loss={train_loss:.4f}  "
+                f"train_acc={train_acc:.4f}  val_acc={acc:.4f}  val_def_f1={def_f1:.4f}"
+            )
 
     best_idx = int(np.argmax([m["def_f1"] for m in val_metrics]))
     best = val_metrics[best_idx]
-    print(f"\nBest val_def_f1={best['def_f1']:.4f} at epoch {best_idx+1}")
+    print(f"\nBest val_def_f1={best['def_f1']:.4f} at epoch {best_idx + 1}")
 
     model.eval()
     cap_correct = 0
@@ -381,13 +388,18 @@ def train_attention(
 
     with torch.no_grad():
         for batch in val_loader:
-            batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
+            batch = {
+                k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()
+            }
             logits = model(batch)
             labels = batch["labels"]
             mask = labels != -100
             cap_preds = predict_with_capacity(
-                logits, batch["cu"], batch["capacities"],
-                batch["n_trucks"], batch["pad_mask"],
+                logits,
+                batch["cu"],
+                batch["capacities"],
+                batch["n_trucks"],
+                batch["pad_mask"],
             )
             cap_labels_all.append(labels[mask].cpu().numpy())
             cap_preds_all.append(cap_preds[mask].cpu().numpy())
@@ -402,7 +414,11 @@ def train_attention(
     cap_acc = cap_correct / n_total if n_total > 0 else 0.0
     cap_def_prec = cap_def_correct / cap_def_pred if cap_def_pred > 0 else 0.0
     cap_def_rec = cap_def_correct / n_def_actual if n_def_actual > 0 else 0.0
-    cap_def_f1 = 2 * cap_def_prec * cap_def_rec / (cap_def_prec + cap_def_rec) if (cap_def_prec + cap_def_rec) > 0 else 0.0
+    cap_def_f1 = (
+        2 * cap_def_prec * cap_def_rec / (cap_def_prec + cap_def_rec)
+        if (cap_def_prec + cap_def_rec) > 0
+        else 0.0
+    )
     print(f"Capacity-aware:   val_acc={cap_acc:.4f}  val_def_f1={cap_def_f1:.4f}")
 
     with torch.no_grad():
@@ -417,24 +433,26 @@ def train_attention(
 
     with mlflow.start_run(run_name=run_name):
         run_id = mlflow.active_run().info.run_id
-        mlflow.log_params({
-            "att_d_model": d_model,
-            "att_nhead": nhead,
-            "att_num_layers": num_layers,
-            "att_dropout": dropout,
-            "att_batch_size": batch_size,
-            "att_learning_rate": learning_rate,
-            "att_n_epochs": n_epochs,
-            "att_truck_axis": "dynamic (any T)",
-            "att_canonical": "fleet by capacity desc; 0=SIN_CAMION, 1..T",
-        })
+        mlflow.log_params(
+            {
+                "att_d_model": d_model,
+                "att_nhead": nhead,
+                "att_num_layers": num_layers,
+                "att_dropout": dropout,
+                "att_batch_size": batch_size,
+                "att_learning_rate": learning_rate,
+                "att_n_epochs": n_epochs,
+                "att_truck_axis": "dynamic (any T)",
+                "att_canonical": "fleet by capacity desc; 0=SIN_CAMION, 1..T",
+            }
+        )
         mlflow.log_metric("att_val_accuracy", best["acc"])
         mlflow.log_metric("att_val_defer_f1", best["def_f1"])
         mlflow.log_metric("att_cap_accuracy", cap_acc)
         mlflow.log_metric("att_cap_defer_f1", cap_def_f1)
         mlflow.log_param("att_decoder_policy", policy)
 
-        for epoch, (tm, vm) in enumerate(zip(train_epochs, val_metrics), start=1):
+        for epoch, (tm, vm) in enumerate(zip(train_epochs, val_metrics, strict=False), start=1):
             mlflow.log_metric("att_train_loss", tm["loss"], step=epoch)
             mlflow.log_metric("att_train_accuracy_curve", tm["acc"], step=epoch)
             mlflow.log_metric("att_val_accuracy_curve", vm["acc"], step=epoch)
@@ -445,16 +463,30 @@ def train_attention(
                 if isinstance(v, dict):
                     for sub_k, sub_v in v.items():
                         mlflow.log_metric(f"att_{agg}_{k}_{sub_k}", sub_v)
-                elif isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(v, bool):
+                elif isinstance(v, (int, float, np.integer, np.floating)) and not isinstance(
+                    v, bool
+                ):
                     mlflow.log_metric(f"att_{agg}_{k}", v)
 
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "model.pt")
-            torch.save(_attention_checkpoint(model, classes, ep0, d_model, nhead, num_layers, dropout), path)
+            torch.save(
+                _attention_checkpoint(model, classes, ep0, d_model, nhead, num_layers, dropout),
+                path,
+            )
             mlflow.log_artifact(path, "model")
 
-        _save_attention_artifact(model, classes, ep0, train_ds.scaler, train_ds.arrays.max_trucks,
-                                 d_model, nhead, num_layers, dropout)
+        _save_attention_artifact(
+            model,
+            classes,
+            ep0,
+            train_ds.scaler,
+            train_ds.arrays.max_trucks,
+            d_model,
+            nhead,
+            num_layers,
+            dropout,
+        )
 
     return {
         "att_results": {
@@ -487,8 +519,9 @@ def _attention_checkpoint(model, classes, ep0, d_model, nhead, num_layers, dropo
     }
 
 
-def _save_attention_artifact(model, classes, ep0, scaler, max_trucks, d_model, nhead,
-                             num_layers, dropout) -> None:
+def _save_attention_artifact(
+    model, classes, ep0, scaler, max_trucks, d_model, nhead, num_layers, dropout
+) -> None:
     """Persist the attention checkpoint + preprocessing schema next to the GBTs."""
     from pathlib import Path
 
@@ -496,16 +529,19 @@ def _save_attention_artifact(model, classes, ep0, scaler, max_trucks, d_model, n
     out.mkdir(parents=True, exist_ok=True)
     import json
 
-    torch.save(_attention_checkpoint(model, classes, ep0, d_model, nhead, num_layers, dropout),
-               out / "model.pt")
+    torch.save(
+        _attention_checkpoint(model, classes, ep0, d_model, nhead, num_layers, dropout),
+        out / "model.pt",
+    )
     with open(out / "pairwise_schema.json", "w", encoding="utf-8") as fh:
         json.dump(
             {
                 "classes": classes,
                 "max_trucks_padding": int(max_trucks),
                 "blocks": scaler.to_dict(),
-                "model_config": _attention_checkpoint(model, classes, ep0, d_model, nhead,
-                                                      num_layers, dropout)["model_config"],
+                "model_config": _attention_checkpoint(
+                    model, classes, ep0, d_model, nhead, num_layers, dropout
+                )["model_config"],
             },
             fh,
             indent=2,

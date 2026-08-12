@@ -46,10 +46,19 @@ package = false
 line-length = 100
 target-version = "py312"
 
-# El árbol heredado (scripts/reporting, src/profiler, fleet_loading, notebooks) acumula
-# ~514 violaciones anteriores a este linter. Excluirlas es lo que hace que `ruff check .`
-# sea utilizable: sin esto el comando falla siempre y nadie lo corre. Limpiarlas es un
-# trabajo aparte -- al hacerlo, quitar la ruta de esta lista.
+# Árbol heredado pendiente de limpiar. Se reduce por etapas: al dejar un
+# directorio en verde se quita de esta lista y no vuelve a entrar.
+#
+# Conteo medido (ruff --no-force-exclude), pendiente ~423:
+#   scripts/reporting  331   <- 73 % del total; buena parte desaparece al borrar
+#                                el árbol muerto de plotting (duplicado)
+#   src/profiler        81
+#   scripts/loading     21
+#   scripts/profiling   14
+#   src/pipeline         5
+#   src/loading          2
+#
+# Ya saneados y fuera de la lista: fleet_loading (31 errores, corregidos aquí).
 extend-exclude = [
     "scripts/reporting",
     "scripts/profiling",
@@ -61,10 +70,7 @@ extend-exclude = [
     "scripts/build_vehicle_features.py",
     "src/profiler",
     "src/pipeline",
-    "src/data_dictionary.py",
     "src/loading",
-    "fleet_loading",
-    "notebooks",
 ]
 
 [tool.ruff.format]

@@ -46,9 +46,9 @@ from src.modeling.features import (  # noqa: E402
 )
 from src.modeling.metrics import (  # noqa: E402
     aggregate,
+    episode_logits,
     evaluate_greedy,
     evaluate_model,
-    episode_logits,
 )
 
 VEHICLE_DIM = 6
@@ -70,7 +70,7 @@ def build_tensors(
     classes: list[str],
     scaler: BlockScaler | None = None,
     max_trucks: int | None = None,
-) -> tuple[list, "object", BlockScaler]:
+) -> tuple[list, object, BlockScaler]:
     """EpisodeTensors + ModelArrays for a split, reusing ``src.modeling``.
 
     The scaler is fit by the caller on train and passed down, so train and val
@@ -138,7 +138,7 @@ def stack_episode_logits(episodes: list, arrays, logits_by_episode: dict) -> np.
     """Stack per-episode logits into a ``(N, max_trucks + 1)`` array for metrics."""
     max_t = arrays.max_trucks
     out = np.zeros((arrays.pair.shape[0], max_t + 1), dtype=np.float64)
-    for ep_i, ep in enumerate(episodes):
+    for ep_i, _ep in enumerate(episodes):
         rows = np.flatnonzero(arrays.episode_index == ep_i)
         lg = logits_by_episode[ep_i]
         out[rows, : lg.shape[1]] = lg
@@ -182,9 +182,7 @@ def evaluate_split(
     """
     n_labels = arrays.max_trucks + 1
     n_classes = len(classes)
-    model = aggregate(
-        evaluate_model(episodes, arrays, logits, policy, n_classes), n_labels
-    )
+    model = aggregate(evaluate_model(episodes, arrays, logits, policy, n_classes), n_labels)
     greedy = aggregate(evaluate_greedy(episodes, arrays, n_classes), n_labels)
     return model, greedy
 
@@ -194,9 +192,7 @@ def select_policy(episodes: list, arrays, logits: np.ndarray, n_classes: int) ->
     n_labels = arrays.max_trucks + 1
     best, best_gap = "model", float("inf")
     for policy in POLICIES:
-        m = aggregate(
-            evaluate_model(episodes, arrays, logits, policy, n_classes), n_labels
-        )
+        m = aggregate(evaluate_model(episodes, arrays, logits, policy, n_classes), n_labels)
         if m["loaded_gap_mean"] < best_gap:
             best, best_gap = policy, m["loaded_gap_mean"]
     return best

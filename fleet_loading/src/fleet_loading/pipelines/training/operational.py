@@ -112,7 +112,9 @@ def plan_from_truck_probs(
     return assign
 
 
-def _plan_stats(assign: np.ndarray, cu: np.ndarray, capacities: np.ndarray) -> tuple[int, float, float]:
+def _plan_stats(
+    assign: np.ndarray, cu: np.ndarray, capacities: np.ndarray
+) -> tuple[int, float, float]:
     caps = np.asarray(capacities, dtype=float)
     cus = np.asarray(cu, dtype=float)
     loads = np.zeros_like(caps)
@@ -122,6 +124,8 @@ def _plan_stats(assign: np.ndarray, cu: np.ndarray, capacities: np.ndarray) -> t
             loads[j] += cus[i]
             n_loaded += 1
     return n_loaded, float(loads.sum()), float(np.max(loads - caps, initial=0.0))
+
+
 def episode_report(
     ep_id: str,
     assign: np.ndarray,
@@ -157,7 +161,9 @@ def aggregate_operational(rows: list[dict], latency_ms: list[float]) -> dict:
     overflow = np.array([r["max_overflow"] for r in rows], dtype=float)
 
     with np.errstate(divide="ignore", invalid="ignore"):
-        rel_gap = np.where(teacher_loaded > 0, (teacher_loaded - model_loaded) / teacher_loaded, 0.0)
+        rel_gap = np.where(
+            teacher_loaded > 0, (teacher_loaded - model_loaded) / teacher_loaded, 0.0
+        )
 
     n = len(rows)
     return {
@@ -166,7 +172,9 @@ def aggregate_operational(rows: list[dict], latency_ms: list[float]) -> dict:
         "max_overflow_cu": float(overflow.max()),
         # 2. Primary objective: vehicles loaded vs exact teacher.
         "loaded_gap_mean": float((teacher_loaded - model_loaded).mean()),
-        "episodes_matching_teacher_count_pct": float(100.0 * (model_loaded == teacher_loaded).mean()),
+        "episodes_matching_teacher_count_pct": float(
+            100.0 * (model_loaded == teacher_loaded).mean()
+        ),
         "optimality_gap_loaded_pct": float(100.0 * rel_gap.mean()),
         # 3. Secondary objective: CU utilization (delivery's fill efficiency).
         "cu_gap_mean": float((teacher_cu - model_cu).mean()),
@@ -174,9 +182,10 @@ def aggregate_operational(rows: list[dict], latency_ms: list[float]) -> dict:
         "cu_utilization_teacher_pct": float(100.0 * teacher_cu.sum() / capacity.sum()),
         # Deferred totals.
         "deferred_model_total": int((n * 0) + (teacher_loaded.sum() - model_loaded.sum())),
-        "deferred_teacher_total": int((capacity.sum() * 0) + sum(
-            int(np.maximum(0, r["n_vehicles"] - r["teacher_n_loaded"])) for r in rows
-        )),
+        "deferred_teacher_total": int(
+            (capacity.sum() * 0)
+            + sum(int(np.maximum(0, r["n_vehicles"] - r["teacher_n_loaded"])) for r in rows)
+        ),
         # Context + latency (delivery's compute-time metric).
         "n_episodes": n,
         "n_vehicle_rows": int(sum(r["n_vehicles"] for r in rows)),

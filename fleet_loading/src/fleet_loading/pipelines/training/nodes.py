@@ -3,8 +3,14 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import mlflow
+
+if TYPE_CHECKING:
+    # Solo para la anotación de _confusion_matrix_figure: matplotlib se importa
+    # dentro de la función para no cargarlo en cada import del módulo.
+    import matplotlib.figure
 
 MLFLOW_DB = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "mlflow.db")
 mlflow.set_tracking_uri(f"sqlite:///{MLFLOW_DB}")
@@ -12,19 +18,19 @@ mlflow.set_tracking_uri(f"sqlite:///{MLFLOW_DB}")
 REPO_ROOT = Path(__file__).resolve().parents[5]
 ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "fleet_loading"
 
-import sys
+import sys  # noqa: E402
 
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-import numpy as np
-import pandas as pd
-from sklearn.metrics import accuracy_score, confusion_matrix, f1_score
-from sklearn.model_selection import GroupShuffleSplit
+# E402: estos imports van después del parche de sys.path porque `src.*` no es
+# resoluble sin él. El parche desaparece al empaquetar el proyecto.
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+from sklearn.metrics import accuracy_score, confusion_matrix, f1_score  # noqa: E402
+from sklearn.model_selection import GroupShuffleSplit  # noqa: E402
 
-from src.modeling.metrics import evaluate_model
-
-from fleet_loading.pipelines.training.pairwise import (
+from fleet_loading.pipelines.training.pairwise import (  # noqa: E402
     build_tensors,
     derive_classes,
     evaluate_split,
@@ -33,6 +39,7 @@ from fleet_loading.pipelines.training.pairwise import (
     select_policy,
     stack_episode_logits,
 )
+from src.modeling.metrics import evaluate_model  # noqa: E402
 
 # Canonical index space (shared with src/modeling): 0 = SIN_CAMION, 1..T = truck
 # by capacity descending. No hardcoded truck count: the models are pairwise and
@@ -64,11 +71,7 @@ def _log_gbt_curves(model, metric_name: str, error_metric: str, prefix: str) -> 
     if not result:
         return
     train_series = result.get("validation_0") or result.get("training")
-    val_series = (
-        result.get("validation_1")
-        or result.get("valid_1")
-        or result.get("valid_0")
-    )
+    val_series = result.get("validation_1") or result.get("valid_1") or result.get("valid_0")
     for name, series in (("train", train_series), ("val", val_series)):
         if not series:
             continue
@@ -103,7 +106,7 @@ def _log_operational(operational: dict, prefix: str) -> None:
 
 def _confusion_matrix_figure(
     y_true, y_pred, title: str, normalized: bool = False
-) -> "matplotlib.figure.Figure":
+) -> matplotlib.figure.Figure:
     """Render a per-truck confusion matrix over canonical indices.
 
     Labels are dynamic: ``Sin camión`` + one column per truck index actually
@@ -119,7 +122,9 @@ def _confusion_matrix_figure(
     k = int(max(y_true.max(), y_pred.max()))
     labels = [f"Cam{i + 1}" for i in range(k)] + ["Sin camión"]
     cm = confusion_matrix(
-        y_true, y_pred, labels=list(range(k + 1)),
+        y_true,
+        y_pred,
+        labels=list(range(k + 1)),
         normalize="true" if normalized else None,
     )
     disp = ConfusionMatrixDisplay(cm, display_labels=labels)
@@ -134,11 +139,13 @@ def _confusion_matrix_figure(
 
 def _prediction_rows(results, split: str) -> pd.DataFrame:
     """Canonical target/predicted indices from EpisodeResult objects."""
-    return pd.DataFrame({
-        "y_true": np.concatenate([r.target_index for r in results]),
-        "y_pred": np.concatenate([r.predicted_index for r in results]),
-        "split": split,
-    })
+    return pd.DataFrame(
+        {
+            "y_true": np.concatenate([r.target_index for r in results]),
+            "y_pred": np.concatenate([r.predicted_index for r in results]),
+            "split": split,
+        }
+    )
 
 
 def report_confusion_matrices(
@@ -156,15 +163,17 @@ def report_confusion_matrices(
         for prefix, preds in (("xgb", xgb_predictions), ("lgb", lgb_predictions)):
             sub = preds[preds["split"] == split]
             figs[f"{prefix}_confusion_matrix_{split}"] = _confusion_matrix_figure(
-                sub["y_true"], sub["y_pred"],
+                sub["y_true"],
+                sub["y_pred"],
                 f"{prefix} confusion matrix ({split})",
             )
     figs["att_confusion_matrix_val"] = _confusion_matrix_figure(
-        att_predictions["y_true"], att_predictions["y_pred"],
+        att_predictions["y_true"],
+        att_predictions["y_pred"],
         "attention capacity-aware confusion matrix (val)",
     )
 
-    for prefix, preds, results in (
+    for _prefix, preds, results in (
         ("xgb", xgb_predictions, xgb_results or {}),
         ("lgb", lgb_predictions, lgb_results or {}),
     ):
@@ -173,7 +182,8 @@ def report_confusion_matrices(
             continue
         val = preds[preds["split"] == "val"]
         fig = _confusion_matrix_figure(
-            val["y_true"], val["y_pred"],
+            val["y_true"],
+            val["y_pred"],
             "Normalized confusion matrix",
             normalized=True,
         )
@@ -203,32 +213,22 @@ def _save_model_artifact(name: str, classifier, scaler, classes, max_trucks) -> 
     joblib.dump(classifier, out / "classifier.joblib")
 
 
-def encode_features(
-    vehicles: pd.DataFrame, episodes: pd.DataFrame
-) -> pd.DataFrame:
+def encode_features(vehicles: pd.DataFrame, episodes: pd.DataFrame) -> pd.DataFrame:
     """Join vehicles + episodes, keep the teacher columns needed by the pairwise
     tensors (truck_capacities, n_loaded, cu_utilized) and drop non-optimal
     episodes. No truck-count-specific feature engineering: the models consume
     the canonical pairwise tensors from ``src.modeling``.
     """
     keep_ep = ["episode_id", "truck_capacities", "n_loaded", "cu_utilized", "optimal"]
-    df = vehicles.merge(
-        episodes[keep_ep], on="episode_id", how="inner", validate="many_to_one"
-    )
+    df = vehicles.merge(episodes[keep_ep], on="episode_id", how="inner", validate="many_to_one")
     df = df[df["optimal"].astype(bool)].reset_index(drop=True)
     return df.drop(columns=["optimal"])
 
 
-def split_data(
-    df: pd.DataFrame, test_size: float
-) -> tuple[pd.DataFrame, pd.DataFrame]:
+def split_data(df: pd.DataFrame, test_size: float) -> tuple[pd.DataFrame, pd.DataFrame]:
     episodes = df[["episode_id"]].drop_duplicates()
-    splitter = GroupShuffleSplit(
-        n_splits=1, test_size=test_size, random_state=42
-    )
-    train_idx, val_idx = next(
-        splitter.split(episodes, groups=episodes["episode_id"])
-    )
+    splitter = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=42)
+    train_idx, val_idx = next(splitter.split(episodes, groups=episodes["episode_id"]))
 
     train_ep = episodes.iloc[train_idx]["episode_id"]
     val_ep = episodes.iloc[val_idx]["episode_id"]
@@ -241,10 +241,12 @@ def split_data(
 
 def _gbt_classifier_metrics(classifier, val_eps, val_arrays, scaler, classes, policy):
     """Capacity-aware val evaluation: logits -> decode -> episode-level metrics."""
-    predict_proba = lambda x: np.asarray(classifier.predict_proba(x))
+
+    def predict_proba(x):
+        return np.asarray(classifier.predict_proba(x))
+
     val_logits_by_ep = {
-        i: logits_from_proba(ep, scaler, predict_proba)
-        for i, ep in enumerate(val_eps)
+        i: logits_from_proba(ep, scaler, predict_proba) for i, ep in enumerate(val_eps)
     }
     val_logits = stack_episode_logits(val_eps, val_arrays, val_logits_by_ep)
 
@@ -274,14 +276,12 @@ def train_xgboost(
     max_delta_step: int,
     run_name: str,
 ) -> dict:
-    import xgboost as xgb
     import mlflow.xgboost
+    import xgboost as xgb
 
     classes = derive_classes(train_df)
     train_eps, train_arrays, scaler = build_tensors(train_df, classes)
-    val_eps, val_arrays, _ = build_tensors(
-        val_df, classes, scaler, train_arrays.max_trucks
-    )
+    val_eps, val_arrays, _ = build_tensors(val_df, classes, scaler, train_arrays.max_trucks)
 
     X, y = option_rows(train_eps, scaler)
     X_val, y_val = option_rows(val_eps, scaler)
@@ -303,7 +303,8 @@ def train_xgboost(
     with mlflow.start_run(run_name=run_name):
         mlflow.xgboost.autolog(log_models=False, silent=True)
         model.fit(
-            X, y,
+            X,
+            y,
             eval_set=[(X, y), (X_val, y_val)],
             sample_weight=sample_weight,
             verbose=False,
@@ -312,16 +313,19 @@ def train_xgboost(
 
     with mlflow.start_run(run_id=run_id):
         mlflow.log_params({f"xgb_{k}": v for k, v in params.items()})
-        mlflow.log_params({
-            "xgb_feature_space": "pairwise src/modeling tensors (vehicle ⊕ truck ⊕ context)",
-            "xgb_canonical": "fleet by capacity desc; 0=SIN_CAMION, 1..T",
-        })
+        mlflow.log_params(
+            {
+                "xgb_feature_space": "pairwise src/modeling tensors (vehicle ⊕ truck ⊕ context)",
+                "xgb_canonical": "fleet by capacity desc; 0=SIN_CAMION, 1..T",
+            }
+        )
         _log_gbt_curves(model, "logloss", "error", "xgb")
 
-        predict_proba = lambda x: np.asarray(model.predict_proba(x))
+        def predict_proba(x):
+            return np.asarray(model.predict_proba(x))
+
         val_logits_by_ep = {
-            i: logits_from_proba(ep, scaler, predict_proba)
-            for i, ep in enumerate(val_eps)
+            i: logits_from_proba(ep, scaler, predict_proba) for i, ep in enumerate(val_eps)
         }
         val_logits = stack_episode_logits(val_eps, val_arrays, val_logits_by_ep)
         policy = select_policy(val_eps, val_arrays, val_logits, len(classes))
@@ -334,29 +338,31 @@ def train_xgboost(
         from fleet_loading.pipelines.training.pairwise import measure_latency
 
         latency = measure_latency(val_eps, val_arrays, val_logits, policy)
-        operational = {"model": {**model_metrics, "latency": latency},
-                       "greedy": {**greedy_metrics, "latency": latency}}
+        operational = {
+            "model": {**model_metrics, "latency": latency},
+            "greedy": {**greedy_metrics, "latency": latency},
+        }
         _log_operational(operational, "xgb")
 
         mlflow.log_metric("xgb_val_accuracy", acc)
         mlflow.log_metric("xgb_val_defer_f1", f1)
         mlflow.log_param("xgb_decoder_policy", policy)
-        mlflow.sklearn.log_model(
-            model, "model", serialization_format="pickle"
-        )
+        mlflow.sklearn.log_model(model, "model", serialization_format="pickle")
         _save_model_artifact("xgboost", model, scaler, classes, train_arrays.max_trucks)
 
-        train_logits = stack_episode_logits(train_eps, train_arrays, {
-            i: logits_from_proba(ep, scaler, predict_proba)
-            for i, ep in enumerate(train_eps)
-        })
-        train_results = evaluate_model(
-            train_eps, train_arrays, train_logits, policy, len(classes)
+        train_logits = stack_episode_logits(
+            train_eps,
+            train_arrays,
+            {i: logits_from_proba(ep, scaler, predict_proba) for i, ep in enumerate(train_eps)},
         )
-        predictions = pd.concat([
-            _prediction_rows(train_results, "train"),
-            _prediction_rows(results, "val"),
-        ], ignore_index=True)
+        train_results = evaluate_model(train_eps, train_arrays, train_logits, policy, len(classes))
+        predictions = pd.concat(
+            [
+                _prediction_rows(train_results, "train"),
+                _prediction_rows(results, "val"),
+            ],
+            ignore_index=True,
+        )
 
         return {
             "xgb_results": {
@@ -388,9 +394,7 @@ def train_lightgbm(
 
     classes = derive_classes(train_df)
     train_eps, train_arrays, scaler = build_tensors(train_df, classes)
-    val_eps, val_arrays, _ = build_tensors(
-        val_df, classes, scaler, train_arrays.max_trucks
-    )
+    val_eps, val_arrays, _ = build_tensors(val_df, classes, scaler, train_arrays.max_trucks)
 
     X, y = option_rows(train_eps, scaler)
     X_val, y_val = option_rows(val_eps, scaler)
@@ -411,7 +415,8 @@ def train_lightgbm(
     with mlflow.start_run(run_name=run_name):
         mlflow.lightgbm.autolog(log_models=False, silent=True)
         model.fit(
-            X, y,
+            X,
+            y,
             eval_set=[(X, y), (X_val, y_val)],
             eval_metric=["binary_logloss", "binary_error"],
             sample_weight=sample_weight,
@@ -421,16 +426,19 @@ def train_lightgbm(
 
     with mlflow.start_run(run_id=run_id):
         mlflow.log_params({f"lgb_{k}": v for k, v in params.items()})
-        mlflow.log_params({
-            "lgb_feature_space": "pairwise src/modeling tensors (vehicle ⊕ truck ⊕ context)",
-            "lgb_canonical": "fleet by capacity desc; 0=SIN_CAMION, 1..T",
-        })
+        mlflow.log_params(
+            {
+                "lgb_feature_space": "pairwise src/modeling tensors (vehicle ⊕ truck ⊕ context)",
+                "lgb_canonical": "fleet by capacity desc; 0=SIN_CAMION, 1..T",
+            }
+        )
         _log_gbt_curves(model, "binary_logloss", "binary_error", "lgb")
 
-        predict_proba = lambda x: np.asarray(model.predict_proba(x))
+        def predict_proba(x):
+            return np.asarray(model.predict_proba(x))
+
         val_logits_by_ep = {
-            i: logits_from_proba(ep, scaler, predict_proba)
-            for i, ep in enumerate(val_eps)
+            i: logits_from_proba(ep, scaler, predict_proba) for i, ep in enumerate(val_eps)
         }
         val_logits = stack_episode_logits(val_eps, val_arrays, val_logits_by_ep)
         policy = select_policy(val_eps, val_arrays, val_logits, len(classes))
@@ -443,29 +451,31 @@ def train_lightgbm(
         from fleet_loading.pipelines.training.pairwise import measure_latency
 
         latency = measure_latency(val_eps, val_arrays, val_logits, policy)
-        operational = {"model": {**model_metrics, "latency": latency},
-                       "greedy": {**greedy_metrics, "latency": latency}}
+        operational = {
+            "model": {**model_metrics, "latency": latency},
+            "greedy": {**greedy_metrics, "latency": latency},
+        }
         _log_operational(operational, "lgb")
 
         mlflow.log_metric("lgb_val_accuracy", acc)
         mlflow.log_metric("lgb_val_defer_f1", f1)
         mlflow.log_param("lgb_decoder_policy", policy)
-        mlflow.sklearn.log_model(
-            model, "model", serialization_format="pickle"
-        )
+        mlflow.sklearn.log_model(model, "model", serialization_format="pickle")
         _save_model_artifact("lightgbm", model, scaler, classes, train_arrays.max_trucks)
 
-        train_logits = stack_episode_logits(train_eps, train_arrays, {
-            i: logits_from_proba(ep, scaler, predict_proba)
-            for i, ep in enumerate(train_eps)
-        })
-        train_results = evaluate_model(
-            train_eps, train_arrays, train_logits, policy, len(classes)
+        train_logits = stack_episode_logits(
+            train_eps,
+            train_arrays,
+            {i: logits_from_proba(ep, scaler, predict_proba) for i, ep in enumerate(train_eps)},
         )
-        predictions = pd.concat([
-            _prediction_rows(train_results, "train"),
-            _prediction_rows(results, "val"),
-        ], ignore_index=True)
+        train_results = evaluate_model(train_eps, train_arrays, train_logits, policy, len(classes))
+        predictions = pd.concat(
+            [
+                _prediction_rows(train_results, "train"),
+                _prediction_rows(results, "val"),
+            ],
+            ignore_index=True,
+        )
 
         return {
             "lgb_results": {
@@ -495,7 +505,15 @@ def train_attention(
     from fleet_loading.pipelines.training.attention_model import train_attention as _train
 
     return _train(
-        train_df, val_df, episodes,
-        d_model, nhead, num_layers, dropout,
-        batch_size, learning_rate, n_epochs, run_name,
+        train_df,
+        val_df,
+        episodes,
+        d_model,
+        nhead,
+        num_layers,
+        dropout,
+        batch_size,
+        learning_rate,
+        n_epochs,
+        run_name,
     )
