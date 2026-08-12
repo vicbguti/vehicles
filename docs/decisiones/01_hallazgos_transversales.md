@@ -162,9 +162,9 @@ Las dejo listadas; no son mías para arreglar solo.
 
 | Dónde | Dice | Realidad |
 |---|---|---|
-| `reports/.../04_method.md` | El modelo estudiante se implementa en **PyTorch** | La planificación y la sección VI del reporte dicen **Keras 3**. Yo usé Keras 3.15 con backend TensorFlow 2.21. |
+| `docs/historico/04_metodo_original.md` | El modelo estudiante se implementa en **PyTorch** | La planificación y la sección VI del reporte dicen **Keras 3**. Yo usé Keras 3.15 con backend TensorFlow 2.21. |
 | Reporte, Sec. VI | Polars 1.42, PyArrow 24.0, `uv` con bloqueo de versiones | El repo usaba `requirements.txt` sin versiones y pandas. Añadí `pyproject.toml` + `uv.lock` (aditivo, `requirements.txt` sigue ahí). PyArrow resuelto es 25.0. El pipeline sigue en pandas: si queremos afirmar Polars, hay que migrarlo o corregir el texto. |
-| Reporte, Sec. VI | Python 3.12 | Correcto, pero el intérprete del sistema es 3.14 y **TensorFlow no publica ruedas para 3.14**. Hay que crear el entorno con `uv venv --python 3.12` o Keras no instala. |
+| Reporte, Sec. VI | Python 3.12 | Correcto, pero el intérprete del sistema es 3.14 y **TensorFlow no publica ruedas para 3.14**. **Resuelto:** `.python-version` fija 3.12, así que `uv sync` elige el intérprete solo. |
 | `05_evaluation.md` | *"(To be filled after `scripts/eval_loading.py` runs)"* | Ese script no existe. Yo hice `scripts/evaluate_mlp.py` para mi modelo; los resultados de los cinco siguen sin consolidar. |
 
 ---
@@ -203,7 +203,7 @@ De la planificación, y contrastado con el PDF actual:
 
 ## 8. Qué hay disponible para reutilizar
 
-Todo bajo `src/modeling/`, con 80 tests en `tests/modeling/`:
+Todo bajo `src/modeling/`, con 80 pruebas en `tests/modeling/` en ese momento (hoy el repositorio tiene **430**, incluidas 325 del maestro exacto):
 
 | Módulo | Qué resuelve |
 |---|---|
@@ -221,7 +221,7 @@ Cómo reproducir todo:
 
 ```bash
 git lfs pull
-uv venv --python 3.12 && uv sync
+uv sync                                             # .python-version ya fija 3.12
 uv run python scripts/build_vehicle_features.py
 uv run python scripts/build_scenarios.py
 uv run python scripts/train_mlp.py

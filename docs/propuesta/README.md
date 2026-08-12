@@ -1,16 +1,27 @@
-# Fleet Loading — Documentation
+# La propuesta
 
-Active docs for the course project. Read in order:
+Documentos de la propuesta del proyecto. En orden de lectura:
 
-1. [01_problem.md](./01_problem.md) — Real-world problem and capacity constraints
-2. [02_scope.md](../historico/02_alcance_original.md) — Project scope, decisions, constraints
-3. [03_data.md](./03_data.md) — SRI data → training episodes
-4. [04_method.md](../historico/04_metodo_original.md) — Labeler, model, baselines
-5. [05_evaluation.md](./05_evaluation.md) — Metrics and toy-scenario case study
-6. [06_feasibility.md](./06_feasibility.md) — Episode size study (reproducible; run `scripts/loading/episode_feasibility.py`)
+1. [El problema](01_problem.md) — contexto real y restricciones de capacidad
+2. [Los datos](03_data.md) — del dataset del SRI a los episodios de entrenamiento
+3. [Evaluación](05_evaluation.md) — métricas y caso de estudio
+4. [Viabilidad](06_feasibility.md) — estudio del tamaño de episodio (reproducible con `scripts/loading/episode_feasibility.py`)
+5. [Cobertura de features](08_feature_coverage.md)
+6. [Cobertura de escenarios](09_scenarios_coverage.md)
 
-**Case study:** [example/](./example/README.md) — 18-vehicle comparison (status quo vs greedy vs optimal loading)
+**Caso de estudio:** [example/](example/README.md) — comparación con 18
+vehículos (procedimiento actual vs. greedy vs. carga óptima).
 
-**Charts:** [solution/visuals/](./solution/visuals/README.md) — class distribution, geography, seasonality
+**Figuras:** [solution/visuals/](solution/visuals/README.md) — distribución de
+clases, geografía y estacionalidad.
 
-**Archive:** [deferred/](./deferred/README.md) — routing, DRL, and superseded proposals (not part of current scope)
+**Archivo:** [deferred/](deferred/README.md) — ruteo, aprendizaje por refuerzo
+profundo y propuestas superadas. **Fuera del alcance actual.**
+
+!!! info "Dos documentos se movieron"
+    El alcance y el método originales describían un diseño que ya no es el
+    vigente (PyTorch, dos camiones fijos, archivos que nunca existieron). Están
+    en [histórico](../historico/02_alcance_original.md) con el aviso
+    correspondiente. Lo que se construyó de verdad está en
+    [estructura del código](../estructura.md) y
+    [pipeline Kedro](../pipeline_kedro.md).

@@ -74,10 +74,10 @@ cd fleet_loading && uv run --project .. kedro run
 No hay entorno virtual por subproyecto: hay un solo `pyproject.toml` y un solo
 `uv.lock` en la raíz.
 
-Los resultados van a `data/07_model_output/` y quedan registrados en MLflow. Los
+Los resultados van a `fleet_loading/data/07_model_output/` y quedan registrados en MLflow. Los
 modelos entrenados y sus esquemas de preprocesamiento se guardan además en
 `artifacts/fleet_loading/<modelo>/` para el evaluador de extrapolación.
 
 ```bash
-uv run --extra tracking mlflow ui --backend-store-uri sqlite:///mlflow.db
+uv run --extra tracking mlflow ui --backend-store-uri sqlite:///fleet_loading/mlflow.db
 ```

@@ -70,7 +70,7 @@ delante.
 
 ```bash
 git lfs install && git lfs pull                     # 522 MB de datos reales -- ver docs/git_lfs.md
-uv venv --python 3.12 && uv sync                    # Keras 3.15 + TensorFlow 2.21
+uv sync                                             # .python-version ya fija 3.12
 uv run python scripts/build_vehicle_features.py     # ~1 min
 uv run python scripts/build_scenarios.py            # ~7 min
 uv run python scripts/train_mlp.py                  # ~2 min en CPU
@@ -78,7 +78,7 @@ uv run python scripts/evaluate_mlp.py               # incluye la ablación de lo
 uv run python scripts/teacher_self_agreement.py --years 2026
 uv run python scripts/label_ceiling.py              # techo exacto de exactitud
 uv run python scripts/sweep_mlp.py                  # 8 configuraciones, ~25 min
-uv run pytest tests/modeling                        # 88 pruebas
+uv run pytest                                       # 430 pruebas
 ```
 
 > El experimento del orden de la flota
@@ -114,7 +114,7 @@ pyproject.toml + uv.lock
 src/modeling/{canonicalization,dataset,features,mlp_classifier,capacity_decoder,metrics}.py
 scripts/{train_mlp,evaluate_mlp,sweep_mlp,build_extrapolation_set,teacher_self_agreement}.py
 scripts/label_ceiling.py
-tests/modeling/            88 pruebas
+tests/                     430 pruebas (325 del maestro exacto)
 artifacts/mlp/             modelo, métricas, curvas, matriz de confusión
 artifacts/mlp/fleet_order_experiment/   evidencia del §6 del documento 06
 ```

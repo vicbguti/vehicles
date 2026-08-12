@@ -31,8 +31,15 @@ artifacts/mlp/smoke200/
 .pytest_cache/
 *.egg-info/
 
-# MLflow local tracking store
+# MLflow local tracking store. La base la escribe nodes.py en fleet_loading/,
+# no en la raíz (ver MLFLOW_DB en pipelines/training/nodes.py). El sufijo
+# -journal es de SQLite y aparece a mitad de una ejecución.
 mlflow.db
+mlflow.db-journal
+mlruns/
+
+# Salidas intermedias del pipeline Kedro (se regeneran con `just train-fleet`)
+fleet_loading/data/0[4578]_*/
 
 # IDE and Editor Files
 .vscode/

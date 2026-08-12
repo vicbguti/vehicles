@@ -1,75 +1,97 @@
-# Data
+# Los datos
 
-## Source
+## Fuente
 
-SRI New Vehicles registrations (`data/clean/SRI_Vehiculos_Nuevos_*.csv`), 2017–2026. One row ≈ one vehicle registration.
+Matriculación de vehículos nuevos del SRI
+(`data/clean/SRI_Vehiculos_Nuevos_*.csv`), 2017-2026. Una fila ≈ una
+matriculación.
 
-## Training episode
+## El episodio de entrenamiento
 
-An **episode** is a set of vehicles with `(canton, class → CU)` for one time window. **Definition not finalized** — see [06_feasibility.md](./06_feasibility.md) for measured options on SRI data.
+Un **episodio** es el conjunto de vehículos de **un cantón en una semana ISO**,
+junto con una flota de camiones. Cada vehículo aporta su CU según la clase.
 
-Candidates:
+La definición **quedó fijada en cantón-semana**: es la única de las tres
+candidatas que produce manifiestos del tamaño que el maestro exacto puede
+resolver. Las mediciones que llevaron a esa decisión están en
+[viabilidad](06_feasibility.md).
 
-| Definition | Description |
-|------------|-------------|
-| National week | All registrations in ISO week *w* — always large (see feasibility report) |
-| Canton-week | Registrations in canton *c*, week *w* — often N ≤ 20 |
-| Subsample | Draw N vehicles from a real week (stratified) |
+| Definición | Resultado medido |
+|---|---|
+| Semana nacional | Siempre demasiado grande |
+| **Cantón-semana** | **N ≤ 20 en la mayoría de los casos — la elegida** |
+| Submuestreo | Se usa como complemento cuando N > 20 |
 
-### Columns used (2018+ files)
+Total: **34 839 episodios**, 534 680 filas de vehículo.
 
-| Field | CSV column | Model use |
-|-------|------------|-----------|
-| `CANTÓN` | Canton ID | Destination feature |
-| `CLASE` / `SUB CLASE` / `TIPO` | Map to **CU** weight |
-| `FECHA PROCESO (DD/MM/AA)` | ISO year-week episode boundary |
+### Columnas usadas (archivos 2018+)
 
-2017 is excluded (month-only schema, no process date). 2018–2019 use `FECHA PROCESO (MM/DD/AA)`; 2020+ use `(DD/MM/AA)`.
+| Campo | Columna del CSV | Uso |
+|---|---|---|
+| Cantón | `CANTÓN` | Agrupación del episodio |
+| Clase | `CLASE` / `SUB CLASE` / `TIPO` | Se mapea al peso en **CU** |
+| Fecha | `FECHA PROCESO (DD/MM/AA)` | Frontera de año-semana ISO |
 
-## Feature mapping example
+**2017 se excluye**: su esquema es mensual y no trae fecha de proceso, así que
+no se puede situar en el tiempo. 2018-2019 usan `FECHA PROCESO (MM/DD/AA)`;
+2020 en adelante, `(DD/MM/AA)`.
 
-Raw record (abbreviated):
+## Del registro crudo a la feature
 
 ```csv
 …;CLASE;SUB CLASE;TIPO;…;FECHA PROCESO;…;CANTON;…
 …;CAMION;PLATAFORMA-C;PESADO;…;28/2/2026;…;10901;…
 ```
 
-| Raw field | Mapped feature |
-|-----------|----------------|
-| `CANTON` | Canton ID (optional: lat/lon from catalog) |
-| `CLASE` / `SUB CLASE` / `TIPO` | CU value (e.g. SUV 1.0, Sedan 0.67) |
-| `FECHA PROCESO` | Week grouping for episode ID |
+| Campo crudo | Feature |
+|---|---|
+| `CANTON` | Agrupación del episodio |
+| `CLASE` | Valor de CU, según `config/vehicle_classes.yaml`: `AUTOMOVIL` 1,0 · `CAMIONETA` 1,4 · `JEEP` 1,1 · `MOTOCICLETA` 0,2 |
+| `FECHA PROCESO` | Semana del identificador de episodio |
 
-## Discarded columns
+El ejemplo de arriba (`CLASE = CAMION`) queda **fuera de alcance**: las nodrizas
+transportan automóviles, camionetas, jeeps y motocicletas, no otros camiones.
 
-Filtered to reduce noise — not used for loading assignment:
+!!! warning "El cantón no es una feature del modelo"
+    Aunque define el episodio, `canton` **se excluye deliberadamente** de las
+    features (`src/modeling/features.py`), igual que `uid`, `truck_id` y la
+    posición del vehículo dentro de su clase: solo permitirían memorizar la
+    identidad del episodio. Esa decisión resultó tener consecuencias medibles,
+    ver [protocolo de partición](../decisiones/04_protocolo_de_particion.md).
 
-`TIPO TRANSACCIÓN`, `MARCA`, `MODELO`, `PAIS`, `AÑO MODELO`, `CILINDRAJE`, `TIPO COMBUSTIBLE`, `COLOR 1/2`, `AVALUO`, `PERSONA NATURAL - JURIDICA`, `TIPO SERVICIO`, row IDs.
+## Columnas descartadas
 
-## Subsampling large weeks
+`TIPO TRANSACCIÓN`, `MARCA`, `MODELO`, `PAIS`, `AÑO MODELO`, `CILINDRAJE`,
+`TIPO COMBUSTIBLE`, `COLOR 1/2`, `AVALUO`,
+`PERSONA NATURAL - JURIDICA`, `TIPO SERVICIO` e identificadores de fila. Ninguna
+influye en la restricción de capacidad, que es de lo único que trata el
+problema de carga.
 
-If a week has N > 20 vehicles:
+## Semanas grandes
 
-* **Do not** invent a fake manifest.
-* **Subsample** from that week (stratified by canton/class) so the labeler stays tractable.
-* Record parent week ID for traceability.
+Si una semana tiene N > 20 vehículos:
 
-**Reproducible analysis:** [06_feasibility.md](./06_feasibility.md) (regenerate with `python3 scripts/loading/episode_feasibility.py`).
+* **no** se inventa un manifiesto ficticio;
+* se **submuestrea** de esa semana (estratificado por cantón y clase) para que
+  el etiquetador siga siendo tratable;
+* se registra el identificador de la semana padre, para trazabilidad.
 
-## Train / validation split
+Reproducible: `uv run python scripts/loading/episode_feasibility.py`.
 
-**Temporal split** by `FECHA PROCESO`:
+## Partición
 
-* Train: 2017–2024
-* Validate: 2025–2026
+**Holdout temporal** por año ISO, compartido por los cuatro modelos
+(`src/modeling/protocol.py`):
 
-No random row shuffle across years (avoids leakage).
+* entrenamiento: **2018-2024**
+* validación: **2025**
+* prueba: **2026**
 
-## Exploratory charts
+Sin barajado aleatorio de filas entre años. La razón y su efecto medido están en
+[protocolo de partición](../decisiones/04_protocolo_de_particion.md).
 
-Pre-computed visuals supporting demand understanding:
+## Figuras exploratorias
 
-* [solution/visuals/spatial/class_distribution.md](./solution/visuals/spatial/class_distribution.md)
-* [solution/visuals/spatial/geographic_demands.md](./solution/visuals/spatial/geographic_demands.md)
-* [solution/visuals/temporal/](./solution/visuals/temporal/temporal_trends.md) — seasonality and trends
+* [Distribución de clases](solution/visuals/spatial/class_distribution.md)
+* [Demandas geográficas](solution/visuals/spatial/geographic_demands.md)
+* [Tendencias temporales](solution/visuals/temporal/temporal_trends.md) — estacionalidad

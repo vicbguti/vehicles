@@ -42,8 +42,13 @@ camiones fijado— está en [`docs/pipeline_kedro.md`](../docs/pipeline_kedro.md
 
 ## MLflow
 
+Desde la **raíz** del repositorio:
+
 ```bash
-uv run --extra tracking mlflow ui --backend-store-uri sqlite:///mlflow.db
+uv run --extra tracking mlflow ui --backend-store-uri sqlite:///fleet_loading/mlflow.db
 ```
 
-La base está en la raíz del repositorio, no aquí.
+La base la escribe `nodes.py` en `fleet_loading/mlflow.db` (ver `MLFLOW_DB`).
+Un `sqlite:///mlflow.db` a secas desde la raíz abre una base **vacía** y la UI
+no muestra ninguna ejecución — que es lo que documentaban estas páginas hasta
+ahora.

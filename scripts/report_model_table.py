@@ -21,7 +21,14 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
+
+# Salida fresca del pipeline. Está gitignorada: se regenera con `just train-fleet`.
 KEDRO_OUT = REPO / "fleet_loading" / "data" / "07_model_output"
+
+# Copia versionada de la última corrida publicada. Es la que lee CI, que no
+# entrena, y la que hace que `--check` signifique algo en un clon limpio.
+RESULTADOS_PUBLICADOS = REPO / "artifacts" / "fleet_loading" / "results"
+
 MLP_METRICS = REPO / "artifacts" / "mlp" / "metrics.json"
 
 # (etiqueta, archivo, prefijo de las claves dentro del JSON)
@@ -44,18 +51,26 @@ def _get(d: dict[str, Any], *ruta: str, default: Any = None) -> Any:
     return d
 
 
-def _fila(nombre: str, agregados: dict[str, Any], acc: float | None, f1: float | None) -> str:
-    def pct(x: Any) -> str:
-        return "—" if x is None else f"{float(x):.1f} %"
+def _fila(
+    nombre: str,
+    agregados: dict[str, Any],
+    acc: float | None,
+    f1: float | None,
+    latencia: dict[str, Any] | None = None,
+) -> str:
+    """Una fila de la tabla. Los decimales van con coma: el sitio está en español."""
 
     def num(x: Any, n: int = 4) -> str:
-        return "—" if x is None else f"{float(x):.{n}f}"
+        return "—" if x is None else f"{float(x):.{n}f}".replace(".", ",")
 
-    lat = agregados.get("latency", {})
+    def pct(x: Any) -> str:
+        return "—" if x is None else f"{float(x):.1f} %".replace(".", ",")
+
+    lat = latencia if latencia is not None else agregados.get("latency", {}) or {}
     return (
         f"| **{nombre}** "
-        f"| {num(acc, 3) if acc is not None else '—'} "
-        f"| {num(f1, 3) if f1 is not None else '—'} "
+        f"| {num(acc, 3)} "
+        f"| {num(f1, 3)} "
         f"| {num(agregados.get('loaded_gap_mean'))} "
         f"| {pct(agregados.get('episodes_matching_teacher_count_pct'))} "
         f"| {pct(agregados.get('cu_utilization_model_pct'))} "
@@ -65,10 +80,13 @@ def _fila(nombre: str, agregados: dict[str, Any], acc: float | None, f1: float |
 
 
 def construir_tabla() -> str:
-    if not KEDRO_OUT.exists():
+    # Se prefiere la salida fresca del pipeline; si no está (clon limpio, CI),
+    # se leen los resultados publicados.
+    origen = KEDRO_OUT if KEDRO_OUT.exists() else RESULTADOS_PUBLICADOS
+    if not origen.exists():
         raise SystemExit(
-            f"No existe {KEDRO_OUT}. Ejecuta el pipeline primero:\n"
-            "    cd fleet_loading && uv run --project .. kedro run"
+            f"No hay resultados ni en {KEDRO_OUT} ni en {RESULTADOS_PUBLICADOS}.\n"
+            "Ejecuta el pipeline:  just train-fleet"
         )
 
     filas: list[str] = []
@@ -76,7 +94,7 @@ def construir_tabla() -> str:
     n_episodios: int | None = None
 
     for nombre, archivo, prefijo in FUENTES_KEDRO:
-        ruta = KEDRO_OUT / archivo
+        ruta = origen / archivo
         if not ruta.exists():
             print(f"aviso: falta {ruta.name}, se omite {nombre}", file=sys.stderr)
             continue
@@ -97,9 +115,33 @@ def construir_tabla() -> str:
 
     if MLP_METRICS.exists():
         datos = json.loads(MLP_METRICS.read_text(encoding="utf-8"))
-        agregados = _get(datos, "val", "model") or _get(datos, "model") or {}
+        # Puerta de comparabilidad: el MLP solo entra en la tabla si se midió con
+        # el mismo protocolo. Es exactamente lo que falló durante meses.
+        if datos.get("split_strategy") != "time":
+            raise SystemExit(
+                f"artifacts/mlp/metrics.json tiene split_strategy="
+                f"{datos.get('split_strategy')!r}, no 'time'. Sus cifras no son "
+                "comparables con las del pipeline: reentrena el MLP antes de publicar."
+            )
+        agregados = _get(datos, "model", "val", default={})
         if agregados:
-            filas.append(_fila("MLP (Keras)", agregados, None, None))
+            # La latencia del MLP se deja vacía A PROPÓSITO. `scripts/evaluate_mlp.py`
+            # cronometra `model.predict()` + `decode_episode` (inferencia completa,
+            # ~43 ms, dominada por la sobrecarga de Keras), mientras que
+            # `pairwise.py::measure_latency` cronometra solo `decode_episode`
+            # (~0,04 ms). Ponerlas en la misma columna sería publicar dos
+            # mediciones distintas como si fueran comparables, que es justo el
+            # error que este proyecto acaba de corregir en la partición.
+            filas.append(
+                _fila(
+                    "MLP (Keras)",
+                    agregados,
+                    agregados.get("raw_assignment_accuracy"),
+                    agregados.get("macro_f1"),
+                    latencia={},
+                )
+            )
+        greedy = greedy or _get(datos, "baseline_greedy", "val", default=None)
 
     if greedy:
         filas.append(_fila("Greedy (línea base)", greedy, None, None))
@@ -110,9 +152,15 @@ def construir_tabla() -> str:
         "|---|---|---|---|---|---|---|---|"
     )
     pie = (
-        f"\n\nMedido sobre la partición de validación del protocolo temporal "
-        f"({n_episodios or '?'} episodios, año 2025) contra el maestro exacto. "
-        "Generado por `scripts/report_model_table.py`; no editar a mano."
+        f"\n\nMedido sobre la validación del protocolo temporal "
+        f"(**{n_episodios or '?'} episodios**, año 2025) contra el maestro exacto.\n\n"
+        "La **latencia del MLP se omite a propósito**: `scripts/evaluate_mlp.py` "
+        "cronometra la inferencia completa (`model.predict` + decodificación, ~43 ms, "
+        "dominada por la sobrecarga de Keras), mientras que el pipeline Kedro cronometra "
+        "solo `decode_episode` (~0,04 ms). Son dos mediciones distintas y ponerlas en la "
+        "misma columna las haría parecer comparables.\n\n"
+        "Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos. "
+        "**No editar a mano**: se regenera, y `--check` lo verifica en CI."
     )
     return MARCA_INICIO + "\n" + cabecera + "\n" + "\n".join(filas) + pie + "\n" + MARCA_FIN
 

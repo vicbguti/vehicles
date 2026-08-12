@@ -1,41 +1,95 @@
-# Fleet Loading
+# Carga de flota
 
-Supervised imitation learning for capacitated fleet loading — assign vehicles to trucks or defer, trained from exhaustive search labels.
+Asignación vehículo-camión por **aprendizaje supervisado por imitación**, a
+partir del dataset de vehículos nuevos del SRI de Ecuador (2018-2026).
 
-## Models
+Dado un manifiesto —los vehículos matriculados en un cantón durante una semana—
+y una flota de camiones con capacidades heterogéneas, hay que asignar cada
+vehículo a un camión o diferirlo, sin exceder ninguna capacidad, maximizando en
+este orden estricto: **cuántos vehículos se transportan** y, como desempate,
+**cuánto espacio se aprovecha**.
 
-All three models are **pairwise**: they score every `(vehicle, truck)` option plus a defer option and decode with a capacity-respecting decoder, so the truck axis is fully dynamic (any number of trucks, including the 5–10 used in extrapolation tests). They share the canonical `src/modeling` feature tensors and evaluation machinery. Operational metrics are computed against the exact teacher on the held-out val split (6,968 episodes, GroupShuffleSplit by episode_id): fill efficiency, compute ms, and the gap vs the teacher's `n_loaded`. Greedy = largest-first pack baseline. All plans are feasible by construction (`capacity_violation_rate = 0.0` for every model).
+El óptimo exacto lo calcula un buscador propio por programación dinámica
+(`src/loading/labeler.py`, sin solvers externos), y ese óptimo es la etiqueta
+con la que se entrenan cuatro modelos: un MLP en Keras, XGBoost, LightGBM y un
+transformer en PyTorch.
 
-| Model | Per-vehicle acc (decoded) | Defer F1 | Opt. gap (veh) | Matches teacher | Fill (CU) | Compute (mean/p99 ms) |
-|---|---|---|---|---|---|---|
-| **XGBoost** | 81.0% | 0.625 | 0.15% | 97.5% | 35.82% | 0.07 / 0.15 |
-| **LightGBM** | 80.9% | 0.625 | 0.15% | 97.5% | 35.82% | 0.07 / 0.15 |
-| **Transformer** | **82.1%** | **0.703** | 0.16% | 97.4% | **35.82%** | **0.08 / 0.16** |
-| Greedy baseline | — | — | 4.49% | ~87% | 36.40% | 0.02 / 0.04 |
+## Los cuatro modelos comparten todo menos el modelo
 
-Notes:
+Los cuatro son **por pares**: puntúan cada opción `(vehículo, camión)` más la
+opción de diferir, produciendo logits `(V, 1 + T)` en el espacio canónico
+(columna 0 = `SIN_CAMION`, 1..T = camiones por capacidad descendente), y
+decodifican con un decodificador que respeta la capacidad. El eje de camiones es
+completamente dinámico: **ningún modelo tiene un número de camiones codificado**.
 
-- **Per-vehicle accuracy** (all models, capacity-aware decoded labels) is 81–82%; attention's raw-label val accuracy is 84.6%. The greedy baseline's raw per-vehicle accuracy is ~0.21 on the held-out split.
-- **Optimality gap** = `(V_teacher − V_model)/V_teacher` on the primary objective (vehicles loaded). The teacher is the exact DP = brute-force optimum on all 34,839 episodes, so this is the delivery's "brecha óptima en instancias acotadas". All three models now land at ~0.15% — two orders of magnitude closer to the teacher than greedy (4.49%) and a large improvement over the previous per-truck formulation (0.24–4.64%).
-- **Extrapolation beyond training (5–10 trucks):** each model was evaluated on re-labeled manifests with larger fleets (see `scripts/evaluate_fleet_loading.py`). With 5–6 trucks at the same per-truck capacity distribution, all three models match the teacher's `n_loaded` on **100%** of episodes. In the hard scenario (8–10 trucks, total capacity held constant), the models stay at ~98.3–98.6% teacher-matching (XGB 98.4%, LGB 98.3%, attention 98.6%) with zero capacity violations — the pairwise structure generalizes beyond the `1–4` trucks seen in training.
-- **Compute** is the decoder latency in ms (`decode_episode` only, shared step; score assembly is model-specific). All three learned models decode a manifest in <0.1 ms median — far below the greedy baseline's 0.02 ms but all well within interactive bounds. (Greedy's raw-accuracy/fill columns above are from the pre-pairwise report; its decoder latency is 0.02/0.04 ms.)
-- **Fill efficiency** is capped at ~36% because episodes are capacity-rich (more truck capacity than CU demand — see `docs/propuesta/09_scenarios_coverage.md`); teacher and all models converge near the same value, so the discriminating metric is the loaded-gap.
+Comparten los tensores de `src/modeling`, el decodificador, las métricas y —lo
+que hace que sus cifras sean comparables entre sí— **la partición**
+(`src/modeling/protocol.py`).
 
-## Extrapolation results
+Todo plan producido es **factible por construcción**: un vehículo solo se coloca
+si cabe en la capacidad restante. La tasa de violación de capacidad es 0 para
+todos los modelos, y si alguna vez deja de serlo, el resto de las métricas no
+significa nada.
 
-All three models evaluated on re-labeled manifests with fleets larger than the training range (1–4 trucks); `loaded_gap_mean` = mean(teacher − model vehicles loaded):
+## Resultados
 
-| Set (trucks, capacity mode) | XGBoost | LightGBM | Attention | Greedy |
+Medido contra el maestro exacto sobre la validación del holdout temporal.
+
+<!-- INICIO tabla generada -->
+| Modelo | Exactitud | F1 diferir | Brecha de conteo | Iguala al maestro | Llenado (CU) | Violación cap. | Latencia media / p99 (ms) |
+|---|---|---|---|---|---|---|---|
+| **XGBoost** | 0,826 | 0,618 | 0,0288 | 97,2 % | 35,6 % | 0,0 | 0,04 / 0,07 |
+| **LightGBM** | 0,825 | 0,616 | 0,0268 | 97,4 % | 35,6 % | 0,0 | 0,04 / 0,07 |
+| **Transformer** | 0,857 | 0,699 | 0,0318 | 97,0 % | 35,5 % | 0,0 | 0,04 / 0,06 |
+| **MLP (Keras)** | 0,829 | 0,796 | 0,0266 | 97,4 % | 35,6 % | 0,0 | — / — |
+| **Greedy (línea base)** | — | — | 0,6310 | 87,4 % | 36,2 % | 0,0 | 0,04 / 0,07 |
+
+Medido sobre la validación del protocolo temporal (**4030 episodios**, año 2025) contra el maestro exacto.
+
+La **latencia del MLP se omite a propósito**: `scripts/evaluate_mlp.py` cronometra la inferencia completa (`model.predict` + decodificación, ~43 ms, dominada por la sobrecarga de Keras), mientras que el pipeline Kedro cronometra solo `decode_episode` (~0,04 ms). Son dos mediciones distintas y ponerlas en la misma columna las haría parecer comparables.
+
+Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos. **No editar a mano**: se regenera, y `--check` lo verifica en CI.
+<!-- FIN tabla generada -->
+
+- **Brecha de conteo** = cuántos vehículos carga el maestro y el modelo no. Es
+  la métrica que discrimina, porque el llenado en CU está acotado a ~36 %: los
+  episodios son ricos en capacidad —sobra sitio en los camiones—, así que
+  maestro y modelos convergen al mismo valor. Ver
+  [cobertura de escenarios](propuesta/09_scenarios_coverage.md).
+- **Latencia** es el tiempo del decodificador (`decode_episode`), el único paso
+  que los modelos comparten; el ensamblado de los logits es específico de cada
+  uno, y por eso el MLP no tiene fila aquí (ver la nota de la tabla).
+- **Greedy** es la heurística de primer ajuste por tamaño descendente: la línea
+  base a batir. Su brecha de conteo, **0,63 vehículos por episodio frente a
+  ~0,03**, es la diferencia que justifica el proyecto entero.
+- Los cuatro modelos rondan el **97 %** de episodios en los que igualan
+  exactamente al maestro, contra el 87,4 % del greedy.
+
+Las fórmulas exactas están en [métricas operativas](metricas.md).
+
+### Extrapolación a flotas mayores
+
+Los modelos se entrenan con 1-4 camiones. Evaluados sobre manifiestos
+re-etiquetados con flotas más grandes (`scripts/evaluate_fleet_loading.py`),
+donde `loaded_gap_mean` = media de (vehículos del maestro − vehículos del
+modelo):
+
+| Conjunto (camiones, capacidad) | XGBoost | LightGBM | Transformer | Greedy |
 |---|---|---|---|---|
-| 5–6, same distribution | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
-| 8–10, constant total | 0.0274 | 0.0294 | 0.0209 | 0.0157 |
+| 5-6, misma distribución | 0,0000 | 0,0000 | 0,0000 | 0,0000 |
+| 8-10, capacidad total constante | 0,0274 | 0,0294 | 0,0209 | 0,0157 |
 
-Per-model JSON with full aggregates: `artifacts/fleet_loading/<model>/extrap_*_metrics.json`.
+Con 5-6 camiones los tres igualan al maestro en el **100 %** de los episodios,
+sin reentrenar. Es la comprobación de que la estructura por pares generaliza más
+allá del rango visto en entrenamiento.
 
-## Quick start
+Agregados completos por modelo en
+`artifacts/fleet_loading/<modelo>/extrap_*_metrics.json`.
 
-Desde la raíz del repositorio. No hace falta ningún entorno virtual por
-subproyecto: hay un solo `pyproject.toml` y un solo `uv.lock`.
+## Puesta en marcha
+
+Desde la raíz. No hace falta ningún entorno virtual por subproyecto: hay un solo
+`pyproject.toml` y un solo `uv.lock`.
 
 ```bash
 # 1. Entorno y datos. El paso de LFS no es opcional: sin él los CSV son
@@ -43,8 +97,7 @@ subproyecto: hay un solo `pyproject.toml` y un solo `uv.lock`.
 uv sync
 git lfs install --local && git lfs pull
 
-# 2. Datos derivados (el barrido completo de episodios tarda ~30 min;
-#    usa --limit para una muestra)
+# 2. Datos derivados (el barrido completo tarda ~30 min; --limit para muestrear)
 uv run python scripts/build_vehicle_features.py
 uv run python scripts/build_scenarios.py --limit 200
 
@@ -54,19 +107,25 @@ uv run python scripts/evaluate_mlp.py
 
 # 4. Los otros tres modelos (pipeline Kedro). Necesitan sus extras:
 uv sync --extra gbt --extra attention --extra tracking --extra kedro
-cd fleet_loading && uv run --project .. kedro run
+cd fleet_loading && uv run --project .. kedro run     # o: just train-fleet
 
-# 5. MLflow (la base está en la raíz del repo, mlflow.db)
-uv run --extra tracking mlflow ui --backend-store-uri sqlite:///mlflow.db
+# 5. MLflow (la base la escribe el pipeline en fleet_loading/mlflow.db)
+uv run --extra tracking mlflow ui --backend-store-uri sqlite:///fleet_loading/mlflow.db
 
 # 6. Documentación
 uv run --extra docs mkdocs serve
 ```
 
-Con `just` instalado, `just setup` hace el paso 1 y deja los hooks activos.
+Con [`just`](https://github.com/casey/just) instalado, `just setup` hace el paso
+1 y deja los hooks de pre-commit activos. `just --list` muestra el resto.
 
-## Project structure
+## Por dónde seguir
 
-- `fleet_loading/` — Kedro project with encode → split → train pipeline
-- `data/episodes/` — Labeled episodes from exhaustive search teacher
-- `reports/` — Method docs and proposals
+| Si quieres… | Ve a |
+|---|---|
+| entender el problema | [la propuesta](propuesta/README.md) |
+| ver el árbol del código | [estructura](estructura.md) |
+| saber qué hay en `data/` | [datos](datos.md) |
+| las fórmulas de las métricas | [métricas operativas](metricas.md) |
+| por qué el repositorio está así | [decisiones de ingeniería](decisiones/01_hallazgos_transversales.md) |
+| la trazabilidad al reporte IEEE | [entrega](entrega/index.md) |

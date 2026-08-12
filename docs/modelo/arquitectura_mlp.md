@@ -141,7 +141,7 @@ classDiagram
 
 | Componente | Versión | Justificación |
 |---|---|---|
-| Python | 3.12.13 | Es la versión que el resto del proyecto declara. Además, TensorFlow 2.21 sólo publica ruedas hasta CPython 3.13; el intérprete del sistema (3.14) no puede instalarlo, de modo que el entorno se fija explícitamente con `uv venv --python 3.12`. |
+| Python | 3.12.13 | Es la versión que el resto del proyecto declara. Además, TensorFlow 2.21 sólo publica ruedas hasta CPython 3.13; el intérprete del sistema (3.14) no puede instalarlo, de modo que el repositorio fija el intérprete con `.python-version`. |
 | Keras | 3.15.0 | Exigido por la planificación. La API funcional permite declarar el eje de camiones con dimensión dinámica, que es lo que hace posible la arquitectura de la sección 1. |
 | TensorFlow | 2.21.0 | Backend de Keras 3. Se escoge frente a JAX o PyTorch por ser el menos disruptivo: el resto del proyecto no depende de ninguno de los tres, y TensorFlow es el backend por defecto de Keras. |
 | NumPy | 2.5.1 | Construcción de los tensores por par y del enmascarado. |
@@ -358,7 +358,7 @@ Se enuncian de forma explícita para no atribuir al diseño propiedades que no s
 
 ```bash
 git lfs pull                                        # datos reales (522 MB)
-uv venv --python 3.12 && uv sync                    # Keras 3.15 + TensorFlow 2.21
+uv sync                                             # .python-version ya fija 3.12
 uv run python scripts/build_vehicle_features.py     # 2.491.511 vehículos en alcance
 uv run python scripts/build_scenarios.py            # 34.839 episodios, 534.680 filas
 uv run python scripts/train_mlp.py                  # artifacts/mlp/

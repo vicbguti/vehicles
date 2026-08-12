@@ -1,0 +1,132 @@
+{
+  "lgb_val_accuracy": 0.8252835133059233,
+  "lgb_val_defer_f1": 0.6162624821683309,
+  "lgb_operational": {
+    "model": {
+      "capacity_violation_rate": 0.0,
+      "max_overflow_cu": 3.552713678800501e-15,
+      "loaded_gap_mean": 0.026799007444168736,
+      "loaded_gap_max": 2,
+      "episodes_matching_teacher_count_pct": 97.39454094292805,
+      "optimality_gap_loaded_pct": 0.16596613307811825,
+      "cu_gap_mean": 0.0873697270471449,
+      "cu_utilization_model_pct": 35.59114023160405,
+      "cu_utilization_teacher_pct": 36.18146731740685,
+      "deferred_model_total": 2858,
+      "deferred_teacher_total": 2750,
+      "macro_f1": 0.7918666026971579,
+      "raw_assignment_accuracy": 0.8252835133059233,
+      "class_level_agreement_mean": 0.9209307254601737,
+      "episodes_identical_to_teacher_pct": 73.27543424317618,
+      "confusion_matrix": [
+        [
+          1728,
+          811,
+          175,
+          34,
+          2
+        ],
+        [
+          850,
+          18079,
+          1062,
+          153,
+          20
+        ],
+        [
+          241,
+          2149,
+          13781,
+          1385,
+          97
+        ],
+        [
+          36,
+          428,
+          1660,
+          12239,
+          874
+        ],
+        [
+          3,
+          67,
+          169,
+          1385,
+          8971
+        ]
+      ],
+      "n_episodes": 4030,
+      "n_vehicle_rows": 66399,
+      "latency": {
+        "n_manifests_timed": 4030,
+        "mean_ms": 0.04153379548812475,
+        "median_ms": 0.04623249697033316,
+        "p99_ms": 0.07181440094427671
+      }
+    },
+    "greedy": {
+      "capacity_violation_rate": 0.0,
+      "max_overflow_cu": 1.7763568394002505e-15,
+      "loaded_gap_mean": 0.6310173697270471,
+      "loaded_gap_max": 13,
+      "episodes_matching_teacher_count_pct": 87.41935483870968,
+      "optimality_gap_loaded_pct": 4.467997635822733,
+      "cu_gap_mean": 0.004094292803968684,
+      "cu_utilization_model_pct": 36.153803594272105,
+      "cu_utilization_teacher_pct": 36.18146731740685,
+      "deferred_model_total": 5293,
+      "deferred_teacher_total": 2750,
+      "macro_f1": 0.18486315804760942,
+      "raw_assignment_accuracy": 0.2717661410563412,
+      "class_level_agreement_mean": 0.3012426012393747,
+      "episodes_identical_to_teacher_pct": 17.990074441687344,
+      "confusion_matrix": [
+        [
+          1308,
+          1218,
+          199,
+          24,
+          1
+        ],
+        [
+          3489,
+          14438,
+          1879,
+          335,
+          23
+        ],
+        [
+          430,
+          14956,
+          1979,
+          275,
+          13
+        ],
+        [
+          61,
+          13822,
+          1043,
+          291,
+          20
+        ],
+        [
+          5,
+          9980,
+          423,
+          158,
+          29
+        ]
+      ],
+      "n_episodes": 4030,
+      "n_vehicle_rows": 66399,
+      "latency": {
+        "n_manifests_timed": 4030,
+        "mean_ms": 0.04153379548812475,
+        "median_ms": 0.04623249697033316,
+        "p99_ms": 0.07181440094427671
+      }
+    }
+  },
+  "lgb_decoder_policy": "model",
+  "run_id": "144743cfc95d43c19d21f7c7b344786d"
+}

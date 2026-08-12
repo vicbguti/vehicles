@@ -14,9 +14,20 @@
     * **Dependencias no declaradas** — `xgboost`, `lightgbm`, `mlflow` y
       `torch` son extras declarados en `pyproject.toml`.
 
-    Se conserva porque explica **por qué** el repositorio está organizado como
-    está, y porque el diagnóstico sigue siendo la justificación de esas tres
-    piezas. Lo que se lee abajo describe el estado de entonces.
+    **La tabla ya se construyó.** El 12 de agosto de 2026 el pipeline corrió
+    entero por primera vez en este checkout y las cinco filas se midieron
+    sobre la misma partición (4.030 episodios de 2025). Está en
+    [inicio](../index.md), generada por `scripts/report_model_table.py`
+    desde los JSON medidos, no escrita a mano.
+
+    Una salvedad que este documento no había anticipado: la **latencia**
+    del MLP sigue sin ser comparable, porque `evaluate_mlp.py` cronometra
+    la inferencia completa y el pipeline Kedro solo `decode_episode`. Esa
+    celda se deja vacía a propósito en vez de publicar dos mediciones
+    distintas en la misma columna.
+
+    Se conserva porque explica **por qué** el repositorio está organizado
+    como está. Lo que se lee abajo describe el estado de entonces.
 
 > **Interno — no va al reporte.** Para Víctor y Nicolás.
 >

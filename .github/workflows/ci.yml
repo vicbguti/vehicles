@@ -53,6 +53,11 @@ jobs:
       # que impide que la documentación vuelva a describir un repositorio que ya
       # no existe: antes eso solo se detectaba leyendo.
       - run: uv run mkdocs build --strict
+      # La tabla comparativa se genera desde los JSON medidos. Se escribía a
+      # mano, y por eso publicó durante meses las cifras de un protocolo que el
+      # código ya no usaba.
+      - name: la tabla publicada coincide con las métricas medidas
+        run: uv run python scripts/report_model_table.py --check
 
   lock:
     name: uv.lock al día
