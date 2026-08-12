@@ -22,7 +22,7 @@ class VehicleClassConfig:
     out_of_scope: list[str]
 
     @classmethod
-    def from_yaml(cls, path: str) -> "VehicleClassConfig":
+    def from_yaml(cls, path: str) -> VehicleClassConfig:
         with open(path, encoding="utf-8") as f:
             raw = yaml.safe_load(f)
         cu_by_class = {c: v["cu"] for c, v in raw["in_scope"].items()}
@@ -96,10 +96,22 @@ def add_iso_week(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def build_features(df: pd.DataFrame, config: VehicleClassConfig) -> tuple[pd.DataFrame, FilterReport]:
+def build_features(
+    df: pd.DataFrame, config: VehicleClassConfig
+) -> tuple[pd.DataFrame, FilterReport]:
     """Full derived-fields step: filter -> CU -> ISO week."""
     kept, report = filter_in_scope(df, config)
     kept = add_cu(kept, config)
     kept = add_iso_week(kept)
-    cols = ["uid", "codigo_vehiculo", "canton", "clase", "cu", "fecha", "iso_year", "iso_week", "source_year"]
+    cols = [
+        "uid",
+        "codigo_vehiculo",
+        "canton",
+        "clase",
+        "cu",
+        "fecha",
+        "iso_year",
+        "iso_week",
+        "source_year",
+    ]
     return kept[cols].reset_index(drop=True), report

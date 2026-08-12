@@ -48,26 +48,35 @@ uv run python scripts/evaluate_mlp.py
 
 # XGBoost, LightGBM y transformer (pipeline Kedro)
 uv sync --extra gbt --extra attention --extra tracking --extra kedro
-cd fleet_loading && uv run --project .. kedro run
+cd fleet_loading && uv run --project .. kedro run    # o: just train-fleet
 
 # Perfilado y reportes del dataset
 uv run python scripts/run_pipeline.py
 ```
 
+El `--project ..` no es opcional: sin él, `uv` toma `fleet_loading/` como raíz
+de proyecto propia y crea un entorno virtual aparte con otra versión de Python.
+
 Los modelos pesados van en extras opcionales (`gbt`, `attention`, `tracking`,
 `kedro`, `docs`) para no obligar a instalar TensorFlow, PyTorch y los GBT a
-quien solo necesita uno.
+quien solo necesita uno. `torch` se resuelve desde el índice **CPU** de PyTorch:
+el transformer se entrena en CPU y las ruedas de CUDA son varios GB inútiles.
 
 ## Desarrollo
 
 ```bash
-just check      # ruff check + ruff format --check + pytest
-just docs       # sitio MkDocs en local
+just check        # ruff check + ruff format --check + pytest
+just docs         # sitio MkDocs en local
+just docs-build   # mkdocs build --strict: falla ante cualquier enlace roto
+just --list       # todas las recetas
 ```
 
 Lo mismo que verifica la CI. Las 430 pruebas incluyen 325 del maestro exacto,
 validadas por mutación —se comprobó que fallan ante regresiones deliberadas, no
 solo que pasan en verde.
+
+La documentación pasa por `mkdocs build --strict` en CI, así que una referencia
+a un archivo que ya no existe rompe el build en vez de quedarse ahí.
 
 ## Estructura
 

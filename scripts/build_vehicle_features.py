@@ -1,3 +1,6 @@
+# ruff: noqa: E501
+# Las líneas largas son filas de tablas Markdown dentro de f-strings: parten el
+# reporte generado, no solo el código. Mismo criterio que scripts/loading/.
 #!/usr/bin/env python3
 """Build the CU-enriched, in-scope vehicle feature dataset.
 
@@ -15,28 +18,31 @@ Usage (from repo root):
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, timezone
-from pathlib import Path
-
 import sys
+from datetime import UTC, datetime
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.pipeline.cleaning.deduplication import deduplicate_by_vehicle_code
-from src.pipeline.cleaning.loading import load_all_years
-from src.pipeline.transformation.derived_fields import VehicleClassConfig, build_features
+# E402: los imports van después del parche de sys.path porque `src.*` no es
+# resoluble sin él. El parche desaparece al empaquetar el proyecto.
+
+from src.pipeline.cleaning.deduplication import deduplicate_by_vehicle_code  # noqa: E402
+from src.pipeline.cleaning.loading import load_all_years  # noqa: E402
+from src.pipeline.transformation.derived_fields import (  # noqa: E402
+    VehicleClassConfig,
+    build_features,
+)
 
 DATA_DIR = REPO_ROOT / "data" / "clean"
 CONFIG_PATH = REPO_ROOT / "config" / "vehicle_classes.yaml"
 OUTPUT_PATH = REPO_ROOT / "data" / "features" / "vehicles_in_scope.parquet"
-REPORT_PATH = (
-    REPO_ROOT / "reports" / "03_proposals" / "fleet_routing" / "08_feature_coverage.md"
-)
+REPORT_PATH = REPO_ROOT / "reports" / "03_proposals" / "fleet_routing" / "08_feature_coverage.md"
 
 
 def write_report(dedup_report, report, skipped_years: list[int], out_path: Path) -> str:
-    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    generated = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     lines = [
         "# Vehicle Feature Coverage",
         "",
@@ -69,8 +75,8 @@ def write_report(dedup_report, report, skipped_years: list[int], out_path: Path)
         "",
         "## Scope filter",
         "",
-        f"| | Rows | % |",
-        f"|---|------|---|",
+        "| | Rows | % |",
+        "|---|------|---|",
         f"| Total (all SRI classes, post vehicle-dedup) | {report.total_rows:,} | 100.0% |",
         f"| Kept (in-scope classes) | {report.kept_rows:,} | {report.kept_pct:.1f}% |",
         f"| Dropped (out-of-scope classes) | {report.dropped_rows:,} | {100 - report.kept_pct:.1f}% |",
@@ -94,7 +100,10 @@ def write_report(dedup_report, report, skipped_years: list[int], out_path: Path)
         for clase, n in sorted(report.unrecognized_classes.items(), key=lambda kv: -kv[1]):
             lines.append(f"| {clase} | {n:,} |")
     else:
-        lines += ["", "No unrecognized classes — config/vehicle_classes.yaml covers 100% of the raw CLASE catalog."]
+        lines += [
+            "",
+            "No unrecognized classes — config/vehicle_classes.yaml covers 100% of the raw CLASE catalog.",
+        ]
 
     return "\n".join(lines) + "\n"
 
@@ -113,10 +122,14 @@ def main() -> None:
     features.to_parquet(OUTPUT_PATH, index=False)
 
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text(write_report(dedup_report, report, skipped_years, OUTPUT_PATH), encoding="utf-8")
+    REPORT_PATH.write_text(
+        write_report(dedup_report, report, skipped_years, OUTPUT_PATH), encoding="utf-8"
+    )
 
-    print(f"Dedup: {dedup_report.total_rows:,} -> {dedup_report.unique_vehicles:,} unique vehicles "
-          f"({dedup_report.rows_removed:,} rows removed, {dedup_report.vehicles_spanning_multiple_weeks:,} spanned 2+ weeks)")
+    print(
+        f"Dedup: {dedup_report.total_rows:,} -> {dedup_report.unique_vehicles:,} unique vehicles "
+        f"({dedup_report.rows_removed:,} rows removed, {dedup_report.vehicles_spanning_multiple_weeks:,} spanned 2+ weeks)"
+    )
     print(f"Wrote {OUTPUT_PATH} ({report.kept_rows:,} rows, {report.kept_pct:.1f}% of post-dedup)")
     print(f"Wrote {REPORT_PATH}")
 

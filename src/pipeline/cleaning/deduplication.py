@@ -37,7 +37,10 @@ class DedupReport:
 
 
 def deduplicate_by_vehicle_code(
-    df: pd.DataFrame, code_col: str = "codigo_vehiculo", date_col: str = "fecha", keep: str = "first"
+    df: pd.DataFrame,
+    code_col: str = "codigo_vehiculo",
+    date_col: str = "fecha",
+    keep: str = "first",
 ) -> tuple[pd.DataFrame, DedupReport]:
     """One row per `code_col`, keeping the `keep` ("first"/"last") by `date_col`."""
     total = len(df)

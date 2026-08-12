@@ -202,7 +202,10 @@ def assign_vehicles(
                 timed_out = True
                 break
 
-            new_remaining = tuple(r - x for r, x in zip(remaining, loadout))
+            # strict=True: `remaining` y `loadout` tienen una entrada por clase de
+            # vehículo, siempre. Si alguna vez dejaran de coincidir, zip() truncaría
+            # en silencio y el maestro devolvería un óptimo equivocado sin fallar.
+            new_remaining = tuple(r - x for r, x in zip(remaining, loadout, strict=True))
             sub_loaded, sub_cu, sub_loadouts = solve(truck_idx + 1, new_remaining)
             total_loaded, total_cu = cnt + sub_loaded, cu + sub_cu
             if (total_loaded, total_cu) > (best_loaded, best_cu):

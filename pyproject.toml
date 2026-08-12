@@ -83,29 +83,18 @@ target-version = "py312"
 # Árbol heredado pendiente de limpiar. Se reduce por etapas: al dejar un
 # directorio en verde se quita de esta lista y no vuelve a entrar.
 #
-# Conteo medido (ruff --no-force-exclude), pendiente ~360:
-#   scripts/reporting             329   <- 91 % de lo que queda. Buena parte
-#                                          desaparece al borrar el árbol muerto
-#                                          de plotting, que exige poder
-#                                          regenerar las figuras -> bloqueado
-#                                          por data/raw/SRI_Vehiculos_DD.xlsx
-#   scripts/build_vehicle_features.py  13
-#   scripts/build_scenarios.py          8
-#   src/pipeline                        5
-#   scripts/run_*.py                    5
-#   src/loading                         2
+# Queda **una sola** entrada. `scripts/reporting` concentra los 329 errores
+# restantes, y sanearlo no es solo linting: buena parte desaparece al borrar el
+# árbol muerto de plotting, y borrarlo exige poder regenerar las figuras para
+# demostrar por comparación de píxeles que ninguna cambia. Eso está bloqueado
+# por `data/raw/SRI_Vehiculos_DD.xlsx`, que está en .gitignore y no viene en el
+# clon.
 #
 # Ya saneados y fuera de la lista: fleet_loading (31), src/profiler (81),
-# scripts/loading (21), scripts/profiling (14).
+# scripts/loading (21), scripts/profiling (14), scripts/build_*.py (21),
+# src/pipeline (5), scripts/run_*.py (5), src/loading (2).
 extend-exclude = [
     "scripts/reporting",
-    "scripts/run_pipeline.py",
-    "scripts/run_profiling.py",
-    "scripts/run_reporting.py",
-    "scripts/build_scenarios.py",
-    "scripts/build_vehicle_features.py",
-    "src/pipeline",
-    "src/loading",
 ]
 
 [tool.ruff.format]

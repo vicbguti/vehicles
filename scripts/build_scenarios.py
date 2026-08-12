@@ -1,3 +1,6 @@
+# ruff: noqa: E501
+# Las líneas largas son filas de tablas Markdown dentro de f-strings: parten el
+# reporte generado, no solo el código. Mismo criterio que scripts/loading/.
 #!/usr/bin/env python3
 """Build and label all weekly-canton episodes.
 
@@ -19,15 +22,18 @@ from __future__ import annotations
 import argparse
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-import pandas as pd
+# E402: los imports van después del parche de sys.path porque `src.*` no es
+# resoluble sin él. El parche desaparece al empaquetar el proyecto.
 
-from src.loading.scenarios import FLOOR_N, MAX_N, build_all_episodes
+import pandas as pd  # noqa: E402
+
+from src.loading.scenarios import FLOOR_N, MAX_N, build_all_episodes  # noqa: E402
 
 FEATURES_PATH = REPO_ROOT / "data" / "features" / "vehicles_in_scope.parquet"
 EPISODES_PATH = REPO_ROOT / "data" / "episodes" / "episodes.parquet"
@@ -36,7 +42,7 @@ REPORT_PATH = REPO_ROOT / "reports" / "03_proposals" / "fleet_routing" / "09_sce
 
 
 def write_report(episodes_df: pd.DataFrame, summary, elapsed_s: float) -> str:
-    generated = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    generated = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     n = len(episodes_df)
     trivial = int((episodes_df["n_deferred"] == 0).sum()) if n else 0
     non_optimal = int((~episodes_df["optimal"]).sum()) if n else 0
@@ -69,10 +75,16 @@ def write_report(episodes_df: pd.DataFrame, summary, elapsed_s: float) -> str:
         "| | |",
         "|---|---|",
         f"| Filas en episode_vehicles.parquet | {int(episodes_df['n_sampled'].sum()) if n else 0:,} |",
-        f"| Episodios triviales (nadie deferido) | {trivial:,} ({100*trivial/n:.1f}%)" if n else "| Episodios triviales | 0 |",
+        f"| Episodios triviales (nadie deferido) | {trivial:,} ({100 * trivial / n:.1f}%)"
+        if n
+        else "| Episodios triviales | 0 |",
         f"| Episodios no-óptimos (time_budget agotado) | {non_optimal:,} |",
-        f"| search_time_ms promedio | {episodes_df['search_time_ms'].mean():.1f}" if n else "| search_time_ms promedio | - |",
-        f"| search_time_ms p99 | {episodes_df['search_time_ms'].quantile(0.99):.1f}" if n else "| search_time_ms p99 | - |",
+        f"| search_time_ms promedio | {episodes_df['search_time_ms'].mean():.1f}"
+        if n
+        else "| search_time_ms promedio | - |",
+        f"| search_time_ms p99 | {episodes_df['search_time_ms'].quantile(0.99):.1f}"
+        if n
+        else "| search_time_ms p99 | - |",
     ]
     return "\n".join(lines) + "\n"
 
@@ -84,7 +96,9 @@ def main() -> None:
     args = parser.parse_args()
 
     if not FEATURES_PATH.exists():
-        print(f"ERROR: {FEATURES_PATH} no existe -- corran scripts/build_vehicle_features.py primero.")
+        print(
+            f"ERROR: {FEATURES_PATH} no existe -- corran scripts/build_vehicle_features.py primero."
+        )
         raise SystemExit(1)
 
     df = pd.read_parquet(FEATURES_PATH)
@@ -102,8 +116,10 @@ def main() -> None:
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(write_report(episodes_df, summary, elapsed), encoding="utf-8")
 
-    print(f"Grupos totales: {summary.n_groups_total:,}  bajo el piso: {summary.n_below_floor:,}  "
-          f"episodios construidos: {summary.n_episodes_built:,}  ({elapsed:.1f}s)")
+    print(
+        f"Grupos totales: {summary.n_groups_total:,}  bajo el piso: {summary.n_below_floor:,}  "
+        f"episodios construidos: {summary.n_episodes_built:,}  ({elapsed:.1f}s)"
+    )
     print(f"Wrote {EPISODES_PATH}")
     print(f"Wrote {VEHICLES_PATH}")
     print(f"Wrote {REPORT_PATH}")

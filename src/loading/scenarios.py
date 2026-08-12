@@ -33,8 +33,8 @@ import pandas as pd
 
 from src.loading.labeler import Vehicle, assign_vehicles
 
-FLOOR_N = 5          # below this, see module docstring -- decided in conversation
-MAX_N = 20           # labeler's practical per-episode budget (see 06_feasibility.md)
+FLOOR_N = 5  # below this, see module docstring -- decided in conversation
+MAX_N = 20  # labeler's practical per-episode budget (see 06_feasibility.md)
 N_TRUCKS_RANGE = (1, 4)
 CAP_RANGE = (3.0, 9.0)
 
@@ -51,7 +51,9 @@ def episode_seed(iso_year: int, iso_week: int, canton) -> int:
     return int(digest[:8], 16)
 
 
-def stratified_subsample(group: pd.DataFrame, max_n: int, rng: random.Random) -> tuple[pd.DataFrame, int]:
+def stratified_subsample(
+    group: pd.DataFrame, max_n: int, rng: random.Random
+) -> tuple[pd.DataFrame, int]:
     """If len(group) > max_n, sample down to max_n preserving class
     proportions (largest-remainder rounding so counts sum exactly to
     max_n). Returns (sampled_frame, n_excluded)."""
@@ -140,16 +142,18 @@ def build_and_label_episode(
     vehicle_records = []
     for row in sampled.itertuples():
         truck = result.assignment[row.uid]
-        vehicle_records.append({
-            "episode_id": eid,
-            "uid": row.uid,
-            "codigo_vehiculo": row.codigo_vehiculo,
-            "clase": row.clase,
-            "cu": row.cu,
-            "canton": canton,
-            "truck": truck,
-            "loaded": truck != "SIN_CAMION",
-        })
+        vehicle_records.append(
+            {
+                "episode_id": eid,
+                "uid": row.uid,
+                "codigo_vehiculo": row.codigo_vehiculo,
+                "clase": row.clase,
+                "cu": row.cu,
+                "canton": canton,
+                "truck": truck,
+                "loaded": truck != "SIN_CAMION",
+            }
+        )
 
     return episode_record, vehicle_records
 

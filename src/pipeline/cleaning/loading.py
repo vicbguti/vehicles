@@ -53,8 +53,20 @@ CODE_COLUMN_CANDIDATES = [
 ]
 
 SPANISH_MONTHS = {
-    "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
-    "jul": 7, "ago": 8, "sep": 9, "sept": 9, "set": 9, "oct": 10, "nov": 11, "dic": 12,
+    "ene": 1,
+    "feb": 2,
+    "mar": 3,
+    "abr": 4,
+    "may": 5,
+    "jun": 6,
+    "jul": 7,
+    "ago": 8,
+    "sep": 9,
+    "sept": 9,
+    "set": 9,
+    "oct": 10,
+    "nov": 11,
+    "dic": 12,
 }
 
 
@@ -160,7 +172,9 @@ def load_year_frame(csv_path: Path) -> pd.DataFrame | None:
     return df.reset_index(drop=True)
 
 
-def load_all_years(data_dir: Path, years: list[int] | None = None) -> tuple[pd.DataFrame, list[int]]:
+def load_all_years(
+    data_dir: Path, years: list[int] | None = None
+) -> tuple[pd.DataFrame, list[int]]:
     """Concatenate every available year into one frame.
 
     Returns (frame, skipped_years).
@@ -180,7 +194,11 @@ def load_all_years(data_dir: Path, years: list[int] | None = None) -> tuple[pd.D
             continue
         parts.append(frame)
 
-    combined = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(
-        columns=["fecha", "canton", "clase", "source_year", "codigo_vehiculo", "uid"]
+    combined = (
+        pd.concat(parts, ignore_index=True)
+        if parts
+        else pd.DataFrame(
+            columns=["fecha", "canton", "clase", "source_year", "codigo_vehiculo", "uid"]
+        )
     )
     return combined, skipped
