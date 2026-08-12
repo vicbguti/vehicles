@@ -28,6 +28,7 @@ import yaml  # noqa: E402
 
 from src.modeling.capacity_decoder import POLICIES  # noqa: E402
 from src.modeling.dataset import (  # noqa: E402
+    assert_no_episode_leakage,
     drop_non_optimal,
     load_episode_tables,
     split_by_episode_hash,
@@ -40,6 +41,7 @@ from src.modeling.features import (  # noqa: E402
     build_model_arrays,
 )
 from src.modeling.metrics import aggregate, evaluate_greedy, evaluate_model  # noqa: E402
+from src.modeling.protocol import SplitConfig  # noqa: E402
 
 DEFAULT_MODEL_DIR = REPO_ROOT / "artifacts" / "mlp"
 DEFAULT_EPISODES_DIR = REPO_ROOT / "data" / "episodes"
@@ -199,15 +201,22 @@ def main() -> None:
         print(f"\nMétricas en {args.model_dir / args.out_name}")
         return
 
+    split_config = SplitConfig.from_mapping(data_cfg)
     if args.split == "time":
         splits = split_by_time(
             joined,
-            tuple(data_cfg["train_years"]),
-            tuple(data_cfg["val_years"]),
-            tuple(data_cfg["test_years"]),
+            split_config.train_years,
+            split_config.val_years,
+            split_config.test_years,
         )
+        protocol_id = split_config.protocol_id
     else:
         splits = split_by_episode_hash(joined)
+        protocol_id = "hash-por-episodio"
+
+    # train_mlp.py ya lo comprobaba; aquí faltaba. Evaluar sobre una partición
+    # con fugas da métricas infladas sin ningún síntoma visible.
+    assert_no_episode_leakage(splits)
 
     episodes = {n: build_all_episodes(df, classes) for n, df in splits.items()}
     arrays = {n: build_model_arrays(e, scaler, max_trucks) for n, e in episodes.items()}
@@ -270,6 +279,10 @@ def main() -> None:
         "model_dir": str(args.model_dir),
         "episodes_dir": str(args.episodes_dir),
         "split_strategy": args.split,
+        # Protocolo y partición reportada: sin estas dos marcas no hay forma de
+        # saber si este resultado es comparable con el de otro modelo.
+        "protocol": protocol_id,
+        "split": "test",
         "decoder_policy_selected": best_policy,
         "decoder_policy_scan_on_val": {p: _slim(m) for p, m in policy_scan.items()},
         "labels": labels,

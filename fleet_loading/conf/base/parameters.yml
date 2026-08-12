@@ -1,4 +1,11 @@
-test_size: 0.2
+# Partición compartida por los cuatro modelos (ver src/modeling/protocol.py).
+# Sustituye a `test_size: 0.2` + GroupShuffleSplit, que medía distinto que el
+# MLP y hacía incomparable la tabla de resultados.
+split:
+  train_years: [2018, 2019, 2020, 2021, 2022, 2023, 2024]
+  val_years: [2025]
+  test_years: [2026]
+
 
 xgboost:
   run_name: xgboost_baseline

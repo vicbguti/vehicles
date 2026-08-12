@@ -21,7 +21,7 @@ def create_pipeline(**kwargs) -> Pipeline:
             ),
             node(
                 func=split_data,
-                inputs=["encoded_vehicles", "params:test_size"],
+                inputs=["encoded_vehicles", "params:split"],
                 outputs=["train_df", "val_df"],
                 name="split",
             ),

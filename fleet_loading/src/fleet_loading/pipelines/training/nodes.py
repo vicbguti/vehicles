@@ -28,7 +28,6 @@ if str(REPO_ROOT) not in sys.path:
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 from sklearn.metrics import accuracy_score, confusion_matrix, f1_score  # noqa: E402
-from sklearn.model_selection import GroupShuffleSplit  # noqa: E402
 
 from fleet_loading.pipelines.training.pairwise import (  # noqa: E402
     build_tensors,
@@ -40,6 +39,7 @@ from fleet_loading.pipelines.training.pairwise import (  # noqa: E402
     stack_episode_logits,
 )
 from src.modeling.metrics import evaluate_model  # noqa: E402
+from src.modeling.protocol import SplitConfig, make_splits  # noqa: E402
 
 # Canonical index space (shared with src/modeling): 0 = SIN_CAMION, 1..T = truck
 # by capacity descending. No hardcoded truck count: the models are pairwise and
@@ -219,24 +219,36 @@ def encode_features(vehicles: pd.DataFrame, episodes: pd.DataFrame) -> pd.DataFr
     episodes. No truck-count-specific feature engineering: the models consume
     the canonical pairwise tensors from ``src.modeling``.
     """
-    keep_ep = ["episode_id", "truck_capacities", "n_loaded", "cu_utilized", "optimal"]
+    # `iso_year` es obligatorio: es el eje de la partición temporal compartida
+    # (src/modeling/protocol.py). Antes se descartaba aquí, que es parte de por
+    # qué este pipeline acabó particionando al azar.
+    keep_ep = [
+        "episode_id",
+        "iso_year",
+        "truck_capacities",
+        "n_loaded",
+        "cu_utilized",
+        "optimal",
+    ]
     df = vehicles.merge(episodes[keep_ep], on="episode_id", how="inner", validate="many_to_one")
-    df = df[df["optimal"].astype(bool)].reset_index(drop=True)
-    return df.drop(columns=["optimal"])
+    return df
 
 
-def split_data(df: pd.DataFrame, test_size: float) -> tuple[pd.DataFrame, pd.DataFrame]:
-    episodes = df[["episode_id"]].drop_duplicates()
-    splitter = GroupShuffleSplit(n_splits=1, test_size=test_size, random_state=42)
-    train_idx, val_idx = next(splitter.split(episodes, groups=episodes["episode_id"]))
+def split_data(df: pd.DataFrame, split_params: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Particiona con el protocolo único del proyecto.
 
-    train_ep = episodes.iloc[train_idx]["episode_id"]
-    val_ep = episodes.iloc[val_idx]["episode_id"]
+    Antes usaba `GroupShuffleSplit(test_size=0.2, random_state=42)`, mientras el
+    MLP usaba holdout temporal, y ambas cifras se publicaban en la misma tabla.
+    Ahora los cuatro modelos comparten `src.modeling.protocol.make_splits`, que
+    además descarta los episodios no óptimos y comprueba que no haya fugas
+    entre particiones.
 
-    train_df = df[df["episode_id"].isin(train_ep)].reset_index(drop=True)
-    val_df = df[df["episode_id"].isin(val_ep)].reset_index(drop=True)
-
-    return train_df, val_df
+    Devuelve (train, val) porque es lo que consume el pipeline Kedro; `test`
+    queda reservado para el reporte final y no se toca durante el entrenamiento.
+    """
+    config = SplitConfig.from_mapping(split_params)
+    bundle = make_splits(df, config)
+    return bundle["train"], bundle["val"]
 
 
 def _gbt_classifier_metrics(classifier, val_eps, val_arrays, scaler, classes, policy):
