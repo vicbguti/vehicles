@@ -34,20 +34,36 @@ Per-model JSON with full aggregates: `artifacts/fleet_loading/<model>/extrap_*_m
 
 ## Quick start
 
+Desde la raíz del repositorio. No hace falta ningún entorno virtual por
+subproyecto: hay un solo `pyproject.toml` y un solo `uv.lock`.
+
 ```bash
-cd fleet_loading
-source .venv/bin/activate
+# 1. Entorno y datos. El paso de LFS no es opcional: sin él los CSV son
+#    punteros de 133 bytes y el pipeline procesa basura en silencio.
+uv sync
+git lfs install --local && git lfs pull
 
-# Run the full pipeline
-kedro run
+# 2. Datos derivados (el barrido completo de episodios tarda ~30 min;
+#    usa --limit para una muestra)
+uv run python scripts/build_vehicle_features.py
+uv run python scripts/build_scenarios.py --limit 200
 
-# Start MLflow UI
-# MLflow runs are stored in fleet_loading/mlflow.db (SQLite)
-MLFLOW_TRACKING_URI=sqlite:///mlflow.db mlflow ui
+# 3. Entrenar y evaluar el MLP
+uv run python scripts/train_mlp.py
+uv run python scripts/evaluate_mlp.py
 
-# View documentation (from project root)
-cd ~/Projects/vehicles && source fleet_loading/.venv/bin/activate && mkdocs serve
+# 4. Los otros tres modelos (pipeline Kedro). Necesitan sus extras:
+uv sync --extra gbt --extra attention --extra tracking --extra kedro
+cd fleet_loading && uv run kedro run
+
+# 5. MLflow (la base está en la raíz del repo, mlflow.db)
+uv run --extra tracking mlflow ui --backend-store-uri sqlite:///mlflow.db
+
+# 6. Documentación
+uv run --extra docs mkdocs serve
 ```
+
+Con `just` instalado, `just setup` hace el paso 1 y deja los hooks activos.
 
 ## Project structure
 

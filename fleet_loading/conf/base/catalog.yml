@@ -1,10 +1,10 @@
 vehicles:
   type: pandas.ParquetDataset
-  filepath: /home/vicbguti/Projects/vehicles/data/episodes/episode_vehicles.parquet
+  filepath: ../data/episodes/episode_vehicles.parquet
 
 episodes:
   type: pandas.ParquetDataset
-  filepath: /home/vicbguti/Projects/vehicles/data/episodes/episodes.parquet
+  filepath: ../data/episodes/episodes.parquet
 
 encoded_vehicles:
   type: pandas.ParquetDataset

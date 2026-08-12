@@ -1,6 +1,6 @@
 site_name: Fleet Loading
 site_description: Supervised imitation learning for capacitated fleet loading
-repo_url: https://github.com/anomalyco/vehicles
+repo_url: https://github.com/vicbguti/vehicles
 theme:
   name: material
   palette:
@@ -36,7 +36,7 @@ nav:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/anomalyco/vehicles
+      link: https://github.com/vicbguti/vehicles
 
 markdown_extensions:
   - pymdownx.highlight

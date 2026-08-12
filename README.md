@@ -1,33 +1,97 @@
-# Vehicle Data Analysis & Machine Learning Project
+# Carga de flota — asignación vehículo-camión
 
-This project focuses on performing an in-depth data quality and quantity analysis of the SRI New Vehicles dataset (2017-2026) and formulating computationally complex learning problems to solve.
+Planificación automatizada de la distribución de vehículos en camiones de carga,
+a partir del dataset de vehículos nuevos del SRI de Ecuador (2018-2026).
 
-## Codebase Documentation
-A detailed breakdown of the project layout, configurations, source code modules, scripts, and analytical outputs is documented in the:
-* **[Project Documentation Index](./docs/README.md)**
+Dado un manifiesto —los vehículos matriculados en un cantón durante una semana—
+y una flota de camiones con capacidades heterogéneas, hay que asignar cada
+vehículo a un camión o diferirlo, sin exceder ninguna capacidad, maximizando en
+este orden estricto: **cuántos vehículos se transportan** y, como desempate,
+**cuánto espacio se aprovecha**.
 
----
+El óptimo exacto lo calcula un buscador propio por programación dinámica
+(`src/loading/labeler.py`, sin solvers externos), y ese óptimo es la etiqueta
+con la que se entrenan cuatro modelos por aprendizaje supervisado por imitación:
+un MLP en Keras, XGBoost, LightGBM y un transformer en PyTorch.
 
-## Data Source
-The raw data is sourced from the official **Servicio de Rentas Internas (SRI) de Ecuador** open data portal:
-* **Source URL**: [SRI Ecuador Datasets](https://www.sri.gob.ec/datasets)
-* **Dataset Name**: Matriculación Vehicular (Vehículos Nuevos)
+## Puesta en marcha
 
----
+Requiere [uv](https://docs.astral.sh/uv/) y Git LFS. **Python 3.12 es
+obligatorio**: TensorFlow 2.21 no publica ruedas para versiones posteriores.
 
-## How to Run
+```bash
+uv sync
+git lfs install --local && git lfs pull
+```
 
-Before running the operational CLI scripts, ensure you activate the project's virtual environment to load the required dependencies (such as `pyyaml`, `matplotlib`, and `pandas`):
+El paso de LFS no es opcional. Los diez CSV de `data/clean/` (535 MB) se
+almacenan como punteros; sin descargarlos, el pipeline lee 133 bytes de texto
+por archivo y produce resultados sin sentido **sin fallar**. Para comprobarlo:
 
-1. **Activate the Virtual Environment**:
-   ```bash
-   source .venv/bin/activate
-   ```
+```bash
+head -c 40 data/clean/SRI_Vehiculos_Nuevos_2025.csv   # no debe decir "version https://git-lfs..."
+```
 
-2. **Run the Complete Pipeline**:
-   ```bash
-   python3 scripts/run_pipeline.py
-   ```
-   *(Or run individual phases: `python3 scripts/run_profiling.py` or `python3 scripts/run_reporting.py`).*
+Con [`just`](https://github.com/casey/just) instalado, `just setup` hace todo lo
+anterior y además activa los hooks de pre-commit.
 
+## Uso
 
+```bash
+# Datos derivados
+uv run python scripts/build_vehicle_features.py        # CSV -> data/features/
+uv run python scripts/build_scenarios.py --limit 200   # -> data/episodes/ (completo: ~30 min)
+
+# MLP
+uv run python scripts/train_mlp.py
+uv run python scripts/evaluate_mlp.py
+
+# XGBoost, LightGBM y transformer (pipeline Kedro)
+uv sync --extra gbt --extra attention --extra tracking --extra kedro
+cd fleet_loading && uv run kedro run
+
+# Perfilado y reportes del dataset
+uv run python scripts/run_pipeline.py
+```
+
+Los modelos pesados van en extras opcionales (`gbt`, `attention`, `tracking`,
+`kedro`, `docs`) para no obligar a instalar TensorFlow, PyTorch y los GBT a
+quien solo necesita uno.
+
+## Desarrollo
+
+```bash
+just check      # ruff check + ruff format --check + pytest
+just docs       # sitio MkDocs en local
+```
+
+Lo mismo que verifica la CI. Las 430 pruebas incluyen 325 del maestro exacto,
+validadas por mutación —se comprobó que fallan ante regresiones deliberadas, no
+solo que pasan en verde.
+
+## Estructura
+
+| Ruta | Qué contiene |
+|---|---|
+| `src/loading/` | Maestro exacto: búsqueda óptima y generación de episodios |
+| `src/modeling/` | Núcleo compartido: canonicalización, tensores por par, decoder con capacidad, métricas y el protocolo de partición |
+| `src/pipeline/`, `src/profiler/` | Ingesta, limpieza y perfilado del dataset del SRI |
+| `fleet_loading/` | Pipeline Kedro de los modelos XGBoost, LightGBM y transformer |
+| `scripts/` | Entradas de línea de comandos |
+| `config/` | Clases de vehículo, hiperparámetros del MLP y rutas del perfilado |
+| `docs/` | Sitio MkDocs |
+| `chat/` | Transcripciones de sesiones de IA (evidencia de la entrega) |
+
+## Datos
+
+**Servicio de Rentas Internas (SRI) del Ecuador**, portal de datos abiertos —
+Matriculación Vehicular, vehículos nuevos: <https://www.sri.gob.ec/datasets>.
+
+2017 se descarta: su CSV no trae la columna `FECHA PROCESO`, así que la
+cobertura real es 2018-2026.
+
+## Documentación
+
+El índice completo está en [`docs/`](./docs/index.md) y se publica con
+`just docs`. Ver también [`docs/git_lfs.md`](./docs/git_lfs.md), que explica por
+qué existe el hook que impide commitear los CSV como blobs.
