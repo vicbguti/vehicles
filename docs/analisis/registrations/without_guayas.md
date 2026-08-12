@@ -1,7 +1,13 @@
-# Registrations without Guayas
+# Matriculaciones sin Guayas
 
-- **Total registrations (all provinces):** 4,306,526
-- **Registrations excluding Guayas:** 3,183,354
-- **Proportion without Guayas:** 73.95 %
+- **Total de matriculaciones (todas las provincias):** 4 306 526
+- **Matriculaciones excluyendo Guayas:** 3 183 354
+- **Proporción sin Guayas:** 73,95 %
 
-> This figure is derived from the latest SRI vehicle dataset (2017‑2026) by aggregating class‑location counts and filtering out the province *Guayas*.
+> Se deriva del dataset del SRI **2017-2026** agregando los conteos por clase y
+> ubicación y filtrando la provincia *Guayas*.
+
+Guayas concentra el 26 % de las matriculaciones del país, así que conviene mirar
+el resto por separado: una figura dominada por Guayas oculta el comportamiento
+de las demás provincias. Ver [matriculaciones totales](totals.md) para la nota
+sobre por qué este alcance incluye 2017 y el del modelado no.

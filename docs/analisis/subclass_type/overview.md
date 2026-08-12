@@ -1,9 +1,15 @@
-# Subclass & Type Visualisation Overview
+# Subclase y tipo
 
-This section documents the new visual assets that break down vehicle registrations by **Subclass** (e.g., `PLATAFORMA‑C`, `CAMIONETA`) and **Type** (e.g., `PESADO`, `LIVIANO`).
+Desglose de las matriculaciones por **subclase** (`PLATAFORMA-C`, `CAMIONETA`,
+…) y por **tipo** (`PESADO`, `LIVIANO`, …).
 
-- Both charts aggregate the data across the full 2017‑2026 period.
-- The heat‑maps use the shared **visual_helpers** style (dark background, viridis colormap, 150 dpi).
-- Figures are generated under `reports/figures/proposals/subclass_type/`.
+- Ambos gráficos agregan todo el período **2017-2026** (ver la nota de
+  [matriculaciones totales](../registrations/totals.md) sobre por qué aquí sí
+  entra 2017).
+- Los mapas de calor usan el estilo compartido de `visual_helpers`: fondo
+  oscuro, mapa de color *viridis*, 150 dpi.
+- Las figuras se generan en `reports/figures/proposals/subclass_type/` mediante
+  `scripts/reporting/proposals/solution_visuals/subclass_type/`.
 
-> The visualisation pipeline mirrors the existing `class_location` visual, re‑using the same configuration and helper utilities.
+La etapa reutiliza la configuración y las utilidades de la visualización
+`class_location`, que resuelve el mismo problema con otro par de ejes.

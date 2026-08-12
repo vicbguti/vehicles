@@ -1,55 +1,52 @@
-# Deduplication Workflow Documentation
+# Deduplicación de los CSV del SRI
 
-## Overview
-This document records the series of actions performed to clean the vehicle registration dataset, reorganize the raw data, and configure version control to handle large CSV files safely.
+!!! info "Registro histórico"
+    Documenta una limpieza puntual del **7 de junio de 2026**. Se conserva
+    porque explica por qué `data/clean/` existe y por qué los CSV van por Git
+    LFS, pero describe acciones ya ejecutadas: no es un procedimiento a repetir.
+    El estado actual de los datos está en [datos](datos.md).
 
-## 1. Duplicate Detection & Removal
-- A script (`scripts/reporting/audits/quality.py`) was run to identify exact‑row duplicates across all yearly CSVs.
-- The duplicate rows (≈ 1.26 M) were removed using `pandas.DataFrame.drop_duplicates()`.
-- Each original file was backed up as `<filename>.bak` before being overwritten with the deduplicated version.
+## 1. Detección y eliminación de duplicados
 
-## 2. Data Directory Restructuring
-- A new directory `data/clean/` was created.
-- All **deduplicated** CSV files were moved into `data/clean/` while the original, untouched files (and their `.bak` backups) remain in `data/raw/` for archival purposes.
-- This separation makes it clear which files are the source archives and which are the ready‑to‑use datasets.
+`scripts/reporting/audits/quality.py` identificó duplicados de fila exacta en
+todos los CSV anuales. Se eliminaron **≈ 1,26 millones** de filas con
+`pandas.DataFrame.drop_duplicates()`. Cada archivo original se respaldó como
+`<nombre>.bak` antes de sobrescribirse.
 
-## 3. Configuration Update
-- `config/config.yaml` was updated:
-  ```yaml
-  data:
-    files_pattern: "data/clean/SRI_Vehiculos_Nuevos_*.csv"
-  ```
-- All reporting and visualisation scripts now reference the cleaned CSV pattern via this config entry, ensuring they operate on the deduplicated data.
+## 2. Reorganización del directorio de datos
 
-## 4. Version‑Control Adjustments
-### Git LFS Setup
-- Git Large File Storage (LFS) was installed and initialized (`git lfs install`).
-- `.gitattributes` was added to track the CSV files with LFS:
-  ```text
-  data/clean/*.csv filter=lfs diff=lfs merge=lfs -text
-  data/raw/*.csv filter=lfs diff=lfs merge=lfs -text
-  ```
-- The large CSVs are now stored as LFS pointers, avoiding GitHub’s 100 MB file‑size limit.
+Los CSV deduplicados se movieron a `data/clean/`. Los originales y sus `.bak`
+quedaron fuera del repositorio.
 
-### Ignoring Backup Files
-- `.gitignore` was updated to ignore all `.bak` files and to comment out the previous raw‑CSV ignore rule:
-  ```text
-  # data/raw/SRI_Vehiculos_Nuevos_*.csv
-  *.bak
-  ```
-- This prevents the backup files from being added to the repository while still keeping them locally for reference.
+Hoy `data/raw/` **ya no existe** en el clon: lo único que se esperaría ahí es el
+diccionario Excel `SRI_Vehiculos_DD.xlsx`, que está en `.gitignore` y hay que
+conseguir aparte (ver [reportes](reportes.md)).
 
-## 5. Commit History
-- The first commit added the deduplication summary, moved the cleaned files, and updated the config.
-- A subsequent commit introduced the Git LFS tracking patterns and the `.bak` ignore rule.
+## 3. Configuración
 
-## 6. Regenerating Visualisations
-After the data layout change, all visualisation scripts were re‑executed to produce up‑to‑date figures based on the cleaned data:
-- `class_location_chart.py`
-- `temporal_trends_combined.py`
-- Other temporal aggregation scripts
+`config/config.yaml` pasó a apuntar al patrón limpio, que es lo que leen todas
+las etapas de perfilado y reportes:
 
-These figures now accurately reflect unique vehicle registrations.
+```yaml
+data:
+  files_pattern: "data/clean/SRI_Vehiculos_Nuevos_*.csv"
+```
 
----
-*Generated on 2026‑06‑07*
+## 4. Git LFS
+
+Los CSV superan el límite de 100 MB por archivo de GitHub, así que se rastrean
+como punteros LFS. `.gitattributes` **actual**:
+
+```text
+data/clean/*.csv filter=lfs diff=lfs merge=lfs -text
+```
+
+La entrada `data/raw/*.csv` que existió en su momento se eliminó: ese directorio
+ya no está. El detalle de por qué existe el hook que impide commitear los CSV
+como blobs está en [Git LFS](git_lfs.md).
+
+## 5. Regeneración de figuras
+
+Tras el cambio de rutas se re-ejecutaron todas las etapas de visualización, de
+modo que las figuras de `reports/figures/` reflejan matriculaciones únicas y no
+las filas duplicadas.
