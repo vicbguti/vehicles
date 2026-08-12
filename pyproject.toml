@@ -21,9 +21,27 @@ dependencies = [
     "openpyxl>=3.1",
 ]
 
-# El sitio MkDocs se declaraba en ninguna parte pese a que docs/index.md manda
-# ejecutar `mkdocs serve`. Como extra opcional no lastra el entorno de trabajo.
+# Extras opcionales. Antes de esto, xgboost, lightgbm, torch, mlflow, kedro y
+# mkdocs se importaban en el código pero no estaban declarados en NINGÚN
+# manifiesto (ni aquí, ni en requirements.txt, ni en fleet_loading/), así que
+# `kedro run` y `mkdocs serve` --los dos comandos del quick start-- fallaban en
+# un clon limpio. Van como extras para no obligar a instalar TensorFlow *y*
+# PyTorch *y* los GBT a quien solo use uno.
 [project.optional-dependencies]
+gbt = [
+    "xgboost>=2.1,<4",
+    "lightgbm>=4.5,<5",
+]
+attention = [
+    "torch>=2.4,<3",
+]
+tracking = [
+    "mlflow>=2.16,<4",
+]
+kedro = [
+    "kedro>=1.5,<2",
+    "kedro-datasets[matplotlib,pandas]>=5",
+]
 docs = [
     "mkdocs>=1.6,<2",
     "mkdocs-material>=9.5,<10",
