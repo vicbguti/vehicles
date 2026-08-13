@@ -40,3 +40,4 @@ mlflow.db
 .DS_Store
 .ipynb_checkpoints/
 site/
+mlruns/
