@@ -120,10 +120,11 @@ Cada `<agregado>` es exactamente la clave de la
 sobre las fórmulas de esta página. Las claves `latency_*` aparecen sueltas
 (`_mean_ms`, `_median_ms`, `_p99_ms`, `_n_manifests_timed`), no anidadas.
 
-La base de datos la escribe el pipeline en `fleet_loading/mlflow.db`:
+Hay una sola base de datos, en la raíz del repositorio, compartida por el
+pipeline Kedro y por `scripts/train_classical.py`:
 
 ```bash
-uv run --extra tracking mlflow ui --backend-store-uri sqlite:///fleet_loading/mlflow.db
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```
 
 ### Curvas de entrenamiento

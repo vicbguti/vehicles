@@ -67,7 +67,7 @@ La maquinaria compartida vive en `pipelines/training/pairwise.py`:
 ## Ejecutar
 
 ```bash
-uv sync --extra gbt --extra attention --extra tracking --extra kedro
+uv sync --extra gbt --extra attention --extra kedro
 cd fleet_loading && uv run --project .. kedro run
 ```
 
@@ -79,5 +79,5 @@ modelos entrenados y sus esquemas de preprocesamiento se guardan además en
 `artifacts/fleet_loading/<modelo>/` para el evaluador de extrapolación.
 
 ```bash
-uv run --extra tracking mlflow ui --backend-store-uri sqlite:///fleet_loading/mlflow.db
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```

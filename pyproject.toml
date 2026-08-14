@@ -19,16 +19,21 @@ dependencies = [
     "seaborn>=0.13,<0.14",
     "pyyaml>=6",
     "openpyxl>=3.1",
+    # mlflow y optuna son core, no extras: los usan tanto el pipeline Kedro
+    # (`nodes.py`, `attention_model.py`) como `scripts/train_classical.py`, y
+    # todo entrenamiento de este repositorio deja traza en MLflow. Estuvieron un
+    # momento declarados a la vez aquí y como extra `tracking`; el merge no
+    # marcó conflicto porque eran secciones distintas del archivo.
     "mlflow>=3.14,<4",
     "optuna>=4.1,<5",
 ]
 
-# Extras opcionales. Antes de esto, xgboost, lightgbm, torch, mlflow, kedro y
-# mkdocs se importaban en el código pero no estaban declarados en NINGÚN
-# manifiesto (ni aquí, ni en requirements.txt, ni en fleet_loading/), así que
-# `kedro run` y `mkdocs serve` --los dos comandos del quick start-- fallaban en
-# un clon limpio. Van como extras para no obligar a instalar TensorFlow *y*
-# PyTorch *y* los GBT a quien solo use uno.
+# Extras opcionales. Antes de esto, xgboost, lightgbm, torch, kedro y mkdocs se
+# importaban en el código pero no estaban declarados en NINGÚN manifiesto (ni
+# aquí, ni en requirements.txt, ni en fleet_loading/), así que `kedro run` y
+# `mkdocs serve` --los dos comandos del quick start-- fallaban en un clon
+# limpio. Van como extras para no obligar a instalar TensorFlow *y* PyTorch *y*
+# los GBT a quien solo use uno.
 [project.optional-dependencies]
 gbt = [
     "xgboost>=2.1,<4",
@@ -36,9 +41,6 @@ gbt = [
 ]
 attention = [
     "torch>=2.4,<3",
-]
-tracking = [
-    "mlflow>=2.16,<4",
 ]
 kedro = [
     "kedro>=1.5,<2",

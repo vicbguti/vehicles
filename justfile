@@ -80,5 +80,5 @@ train-fleet:
 fleet-figures:
     cd fleet_loading && uv run --project .. kedro run --nodes report_confusion_matrices
 
-mlflow:  # la base la escribe el pipeline en fleet_loading/mlflow.db, no en la raíz
-    uv run --extra tracking mlflow ui --backend-store-uri sqlite:///fleet_loading/mlflow.db
+mlflow:  # una sola base en la raíz: la comparten el pipeline y train_classical.py
+    uv run mlflow ui --backend-store-uri sqlite:///mlflow.db

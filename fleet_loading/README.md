@@ -11,7 +11,7 @@ Desde la raíz del repositorio. **No hay entorno virtual por subproyecto**: hay
 un solo `pyproject.toml` y un solo `uv.lock`.
 
 ```bash
-uv sync --extra gbt --extra attention --extra tracking --extra kedro
+uv sync --extra gbt --extra attention --extra kedro
 cd fleet_loading && uv run --project .. kedro run
 ```
 
@@ -45,10 +45,10 @@ camiones fijado— está en [`docs/pipeline_kedro.md`](../docs/pipeline_kedro.md
 Desde la **raíz** del repositorio:
 
 ```bash
-uv run --extra tracking mlflow ui --backend-store-uri sqlite:///fleet_loading/mlflow.db
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 ```
 
-La base la escribe `nodes.py` en `fleet_loading/mlflow.db` (ver `MLFLOW_DB`).
-Un `sqlite:///mlflow.db` a secas desde la raíz abre una base **vacía** y la UI
-no muestra ninguna ejecución — que es lo que documentaban estas páginas hasta
-ahora.
+Hay **una sola base**, en la raíz del repositorio: la comparten este pipeline
+(`MLFLOW_DB` en `nodes.py`) y `scripts/train_classical.py`, así que los siete
+modelos se comparan en la misma UI. Antes eran dos —`nodes.py` escribía dentro
+de `fleet_loading/`— y la UI documentada abría solo una de ellas.

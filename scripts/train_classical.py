@@ -50,8 +50,17 @@ from src.modeling.dataset import (  # noqa: E402
     summarize_splits,
 )
 from src.modeling.features import BlockScaler, build_all_episodes  # noqa: E402
-from src.modeling.flat_features import FlatArrays, build_flat_arrays, flat_feature_names  # noqa: E402
-from src.modeling.metrics import aggregate, build_result, episode_logits, evaluate_greedy  # noqa: E402
+from src.modeling.flat_features import (  # noqa: E402
+    FlatArrays,
+    build_flat_arrays,
+    flat_feature_names,
+)
+from src.modeling.metrics import (  # noqa: E402
+    aggregate,
+    build_result,
+    episode_logits,
+    evaluate_greedy,
+)
 from src.pipeline.transformation.derived_fields import VehicleClassConfig  # noqa: E402
 
 DEFAULT_EPISODES_DIR = REPO_ROOT / "data" / "episodes"
@@ -61,7 +70,7 @@ DEFAULT_TRACKING_URI = f"sqlite:///{REPO_ROOT / 'mlflow.db'}"
 MODEL_NAMES = ("rf", "logreg")
 
 # Hiperparámetros que no se buscan -- se fijan por conocimiento del dominio
-# (desbalance de clases documentado en docs/tarea4/05_hallazgos_para_el_equipo.md
+# (desbalance de clases documentado en docs/decisiones/01_hallazgos_transversales.md
 # punto 5) o por estabilidad numérica, y se aplican tanto en cada intento de
 # Optuna como en el reentrenamiento final del mejor trial.
 RF_FIXED = dict(class_weight="balanced", n_jobs=-1, random_state=42)
@@ -242,7 +251,7 @@ def main() -> None:
     # --- Búsqueda de hiperparámetros ------------------------------------------
     train, val = flat["train"], flat["val"]
 
-    def objective(trial: "optuna.Trial") -> float:
+    def objective(trial: optuna.Trial) -> float:
         from sklearn.metrics import accuracy_score, f1_score
 
         params = {**suggest_params(args.model, trial), **fixed_extras(args.model)}
@@ -252,9 +261,7 @@ def main() -> None:
             pred = model.predict(val.X)
             val_accuracy = accuracy_score(val.target, pred)
             val_macro_f1 = f1_score(val.target, pred, average="macro", zero_division=0)
-            mlflow.log_metrics(
-                {"val_raw_accuracy": val_accuracy, "val_macro_f1": val_macro_f1}
-            )
+            mlflow.log_metrics({"val_raw_accuracy": val_accuracy, "val_macro_f1": val_macro_f1})
         return val_macro_f1
 
     t0 = time.perf_counter()
@@ -295,7 +302,9 @@ def main() -> None:
 
         policy = select_policy(best_model, episodes["val"], val, n_classes)
         domain = {
-            name: domain_metrics_for_split(best_model, episodes[name], flat[name], n_classes, policy)
+            name: domain_metrics_for_split(
+                best_model, episodes[name], flat[name], n_classes, policy
+            )
             for name in ("train", "val", "test")
         }
         greedy_val = aggregate(evaluate_greedy(episodes["val"], val, n_classes), n_labels)

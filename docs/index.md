@@ -106,11 +106,11 @@ uv run python scripts/train_mlp.py
 uv run python scripts/evaluate_mlp.py
 
 # 4. Los otros tres modelos (pipeline Kedro). Necesitan sus extras:
-uv sync --extra gbt --extra attention --extra tracking --extra kedro
+uv sync --extra gbt --extra attention --extra kedro
 cd fleet_loading && uv run --project .. kedro run     # o: just train-fleet
 
-# 5. MLflow (la base la escribe el pipeline en fleet_loading/mlflow.db)
-uv run --extra tracking mlflow ui --backend-store-uri sqlite:///fleet_loading/mlflow.db
+# 5. MLflow (una sola base en la raíz, compartida por todos los entrenamientos)
+uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 
 # 6. Documentación
 uv run --extra docs mkdocs serve

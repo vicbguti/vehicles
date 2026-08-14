@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -12,11 +11,16 @@ if TYPE_CHECKING:
     # dentro de la función para no cargarlo en cada import del módulo.
     import matplotlib.figure
 
-MLFLOW_DB = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "mlflow.db")
-mlflow.set_tracking_uri(f"sqlite:///{MLFLOW_DB}")
-
 REPO_ROOT = Path(__file__).resolve().parents[5]
 ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "fleet_loading"
+
+# Una sola base de MLflow para todo el repositorio. Antes esta ruta subía cuatro
+# niveles y no cinco, así que el pipeline escribía en fleet_loading/mlflow.db
+# mientras scripts/train_classical.py escribía en la raíz: dos bases, y la UI
+# documentada abría solo una. Se usa REPO_ROOT --ya resuelto y absoluto-- en vez
+# de contar `..`, que es lo que hizo posible la discrepancia.
+MLFLOW_DB = REPO_ROOT / "mlflow.db"
+mlflow.set_tracking_uri(f"sqlite:///{MLFLOW_DB}")
 
 import sys  # noqa: E402
 
