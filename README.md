@@ -72,7 +72,7 @@ just docs-build   # mkdocs build --strict: falla ante cualquier enlace roto
 just --list       # todas las recetas
 ```
 
-Lo mismo que verifica la CI. Las 430 pruebas incluyen 325 del maestro exacto,
+Lo mismo que verifica la CI. Las 440 pruebas incluyen 325 del maestro exacto,
 validadas por mutación —se comprobó que fallan ante regresiones deliberadas, no
 solo que pasan en verde.
 
