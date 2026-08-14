@@ -323,6 +323,8 @@ def main() -> None:
         best_run_id = parent_run.info.run_id
 
     # --- Artefactos ------------------------------------------------------------
+    # Los tres JSON terminan en salto de línea: sin él, el hook end-of-file-fixer
+    # los reescribe en cada commit posterior a un reentrenamiento.
     import joblib
 
     joblib.dump(best_model, out_dir / "model.joblib")
@@ -339,7 +341,8 @@ def main() -> None:
             },
             indent=2,
             ensure_ascii=False,
-        ),
+        )
+        + "\n",
         encoding="utf-8",
     )
 
@@ -355,7 +358,8 @@ def main() -> None:
             },
             indent=2,
             ensure_ascii=False,
-        ),
+        )
+        + "\n",
         encoding="utf-8",
     )
 
@@ -388,7 +392,8 @@ def main() -> None:
             },
             indent=2,
             ensure_ascii=False,
-        ),
+        )
+        + "\n",
         encoding="utf-8",
     )
 

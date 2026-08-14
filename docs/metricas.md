@@ -54,13 +54,15 @@ ruido de medición, no como violación.
 | **LightGBM** | 0,825 | 0,616 | 0,0268 | 97,4 % | 35,6 % | 0,0 | 0,04 / 0,07 |
 | **Transformer** | 0,857 | 0,699 | 0,0318 | 97,0 % | 35,5 % | 0,0 | 0,04 / 0,06 |
 | **MLP (Keras)** | 0,829 | 0,796 | 0,0266 | 97,4 % | 35,6 % | 0,0 | — / — |
+| **Random Forest** | 0,831 | 0,795 | 0,0320 | 96,9 % | 35,5 % | 0,0 | — / — |
+| **Regresión logística** | 0,811 | 0,778 | 0,0333 | 96,9 % | 35,5 % | 0,0 | — / — |
 | **Greedy (línea base)** | — | — | 0,6310 | 87,4 % | 36,2 % | 0,0 | 0,04 / 0,07 |
 
 Medido sobre la validación del protocolo temporal (**4030 episodios**, año 2025) contra el maestro exacto.
 
-La **latencia del MLP se omite a propósito**: `scripts/evaluate_mlp.py` cronometra la inferencia completa (`model.predict` + decodificación, ~43 ms, dominada por la sobrecarga de Keras), mientras que el pipeline Kedro cronometra solo `decode_episode` (~0,04 ms). Son dos mediciones distintas y ponerlas en la misma columna las haría parecer comparables.
+La **latencia se omite a propósito** en el MLP, Random Forest y la regresión logística. `scripts/evaluate_mlp.py` cronometra la inferencia completa (`model.predict` + decodificación, ~43 ms, dominada por la sobrecarga de Keras), el pipeline Kedro cronometra solo `decode_episode` (~0,04 ms) y `scripts/train_classical.py` no la cronometra. Son mediciones distintas y ponerlas en la misma columna las haría parecer comparables.
 
-Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos. **No editar a mano**: se regenera, y `--check` lo verifica en CI.
+Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos. **No editar a mano**: se regenera con `--write`, y `--check` lo verifica en CI.
 <!-- FIN tabla generada -->
 
 ## Reporte por episodio (`EpisodeResult`)

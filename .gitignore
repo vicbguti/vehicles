@@ -43,6 +43,19 @@ fleet_loading/mlflow.db
 # Salidas intermedias del pipeline Kedro (se regeneran con `just train-fleet`)
 fleet_loading/data/0[4578]_*/
 
+# El bosque del RF ocupa 1,4 GB: 500 árboles de profundidad 26 con
+# max_features=None sobre 444.051 filas. Es mil veces el mayor binario
+# versionado del repo (1,3 MB, XGBoost) y el hook check-added-large-files corta
+# en 1 MB, así que ni siquiera entraría. Tampoco tendría sentido pasarlo por
+# LFS: agotaría de una vez la cuota gratuita de GitHub para todo el equipo.
+#
+# No se pierde nada reproducible. `artifacts/rf/training_report.json` --que sí
+# se versiona-- guarda `best_params` y la semilla está fija (random_state=42 en
+# RF_FIXED), así que el modelo se vuelve a ajustar con `just train-rf`. Las
+# cifras publicadas salen de ese JSON, no del binario. El de logreg pesa 1,4 kB
+# y se versiona con normalidad.
+artifacts/rf/model.joblib
+
 # IDE and Editor Files
 .vscode/
 .idea/
