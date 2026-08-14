@@ -69,6 +69,14 @@ train-mlp:
 evaluate-mlp:
     uv run python scripts/evaluate_mlp.py
 
+# Los dos clásicos: flota rellenada a ancho fijo y búsqueda con Optuna.
+# Ver docs/modelo/modelos_clasicos.md.
+train-rf trials="50":
+    uv run python scripts/train_classical.py --model rf --split time --n-trials {{ trials }}
+
+train-logreg trials="50":
+    uv run python scripts/train_classical.py --model logreg --split time --n-trials {{ trials }}
+
 # Los tres modelos del pipeline Kedro (XGBoost, LightGBM, transformer).
 #
 # El `--project ..` no es adorno: sin él, uv toma fleet_loading/ como raíz de

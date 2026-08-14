@@ -38,6 +38,16 @@ FUENTES_KEDRO = [
     ("Transformer", "att_results.json", "att"),
 ]
 
+# Los clásicos de `scripts/train_classical.py`. Traen un tercer formato de
+# archivo, pero no una tercera implementación de las métricas: sus agregados
+# salen de `metrics.aggregate()`, igual que los del MLP y los de Kedro, así que
+# `domain_metrics["val"]` tiene exactamente las mismas claves que el
+# `model["val"]` del MLP y `_fila` las lee sin cambios.
+FUENTES_CLASICAS = [
+    ("Random Forest", "rf"),
+    ("Regresión logística", "logreg"),
+]
+
 MARCA_INICIO = "<!-- INICIO tabla generada -->"
 MARCA_FIN = "<!-- FIN tabla generada -->"
 
@@ -49,6 +59,20 @@ def _get(d: dict[str, Any], *ruta: str, default: Any = None) -> Any:
             return default
         d = d[k]
     return d
+
+
+def _exigir_protocolo_temporal(datos: dict[str, Any], fuente: str) -> None:
+    """Puerta de comparabilidad: nadie entra a la tabla con otra partición.
+
+    Es exactamente el fallo que esta tabla publicó durante meses, así que se
+    verifica por archivo en vez de confiar en que quien entrena se acuerde.
+    """
+    if datos.get("split_strategy") != "time":
+        raise SystemExit(
+            f"{fuente} tiene split_strategy={datos.get('split_strategy')!r}, no 'time'. "
+            "Sus cifras no son comparables con las del resto de la tabla: "
+            "reentrena con --split time antes de publicar."
+        )
 
 
 def _fila(
@@ -115,14 +139,7 @@ def construir_tabla() -> str:
 
     if MLP_METRICS.exists():
         datos = json.loads(MLP_METRICS.read_text(encoding="utf-8"))
-        # Puerta de comparabilidad: el MLP solo entra en la tabla si se midió con
-        # el mismo protocolo. Es exactamente lo que falló durante meses.
-        if datos.get("split_strategy") != "time":
-            raise SystemExit(
-                f"artifacts/mlp/metrics.json tiene split_strategy="
-                f"{datos.get('split_strategy')!r}, no 'time'. Sus cifras no son "
-                "comparables con las del pipeline: reentrena el MLP antes de publicar."
-            )
+        _exigir_protocolo_temporal(datos, "artifacts/mlp/metrics.json")
         agregados = _get(datos, "model", "val", default={})
         if agregados:
             # La latencia del MLP se deja vacía A PROPÓSITO. `scripts/evaluate_mlp.py`
@@ -143,6 +160,30 @@ def construir_tabla() -> str:
             )
         greedy = greedy or _get(datos, "baseline_greedy", "val", default=None)
 
+    for nombre, modelo in FUENTES_CLASICAS:
+        ruta = REPO / "artifacts" / modelo / "training_report.json"
+        if not ruta.exists():
+            print(f"aviso: falta {ruta.relative_to(REPO)}, se omite {nombre}", file=sys.stderr)
+            continue
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+        _exigir_protocolo_temporal(datos, str(ruta.relative_to(REPO)))
+        agregados = _get(datos, "domain_metrics", "val", default={})
+        if agregados:
+            # Sin latencia, por el mismo criterio que el MLP: `train_classical.py`
+            # no la cronometra, y una celda vacía dice eso mejor que un número
+            # medido de otra forma.
+            filas.append(
+                _fila(
+                    nombre,
+                    agregados,
+                    agregados.get("raw_assignment_accuracy"),
+                    agregados.get("macro_f1"),
+                    latencia={},
+                )
+            )
+        n_episodios = n_episodios or agregados.get("n_episodes")
+        greedy = greedy or _get(datos, "greedy_baseline_val", default=None)
+
     if greedy:
         filas.append(_fila("Greedy (línea base)", greedy, None, None))
 
@@ -154,11 +195,12 @@ def construir_tabla() -> str:
     pie = (
         f"\n\nMedido sobre la validación del protocolo temporal "
         f"(**{n_episodios or '?'} episodios**, año 2025) contra el maestro exacto.\n\n"
-        "La **latencia del MLP se omite a propósito**: `scripts/evaluate_mlp.py` "
-        "cronometra la inferencia completa (`model.predict` + decodificación, ~43 ms, "
-        "dominada por la sobrecarga de Keras), mientras que el pipeline Kedro cronometra "
-        "solo `decode_episode` (~0,04 ms). Son dos mediciones distintas y ponerlas en la "
-        "misma columna las haría parecer comparables.\n\n"
+        "La **latencia se omite a propósito** en el MLP, Random Forest y la regresión "
+        "logística. `scripts/evaluate_mlp.py` cronometra la inferencia completa "
+        "(`model.predict` + decodificación, ~43 ms, dominada por la sobrecarga de Keras), "
+        "el pipeline Kedro cronometra solo `decode_episode` (~0,04 ms) y "
+        "`scripts/train_classical.py` no la cronometra. Son mediciones distintas y "
+        "ponerlas en la misma columna las haría parecer comparables.\n\n"
         "Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos. "
         "**No editar a mano**: se regenera, y `--check` lo verifica en CI."
     )

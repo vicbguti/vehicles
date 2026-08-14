@@ -1,7 +1,8 @@
 # Pipeline Kedro
 
 Entrena XGBoost, LightGBM y el transformer. El MLP va por su propio camino
-(`scripts/train_mlp.py`), pero los cuatro comparten el núcleo de
+(`scripts/train_mlp.py`) y los dos clásicos por el suyo
+(`scripts/train_classical.py`), pero los seis comparten el núcleo de
 `src/modeling`: los mismos tensores, el mismo decodificador y **la misma
 partición**.
 
@@ -27,7 +28,7 @@ uv run --project .. kedro run --nodes report_confusion_matrices
 
 No hace falta reentrenar.
 
-## La partición es la misma para los cuatro modelos
+## La partición es la misma para los seis modelos
 
 `conf/base/parameters.yml`:
 

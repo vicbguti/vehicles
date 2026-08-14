@@ -34,6 +34,7 @@ nav:
   - El modelo:
     - "Arquitectura del MLP": modelo/arquitectura_mlp.md
     - "Canonicalización y etiquetado": modelo/canonicalizacion.md
+    - "Modelos clásicos (RF y logística)": modelo/modelos_clasicos.md
     - "Resultados": modelo/resultados.md
     - "Métricas operativas": metricas.md
     - "Pipeline Kedro": pipeline_kedro.md

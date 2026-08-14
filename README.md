@@ -11,8 +11,9 @@ este orden estricto: **cuántos vehículos se transportan** y, como desempate,
 
 El óptimo exacto lo calcula un buscador propio por programación dinámica
 (`src/loading/labeler.py`, sin solvers externos), y ese óptimo es la etiqueta
-con la que se entrenan cuatro modelos por aprendizaje supervisado por imitación:
-un MLP en Keras, XGBoost, LightGBM y un transformer en PyTorch.
+con la que se entrenan seis modelos por aprendizaje supervisado por imitación:
+un MLP en Keras, XGBoost, LightGBM, un transformer en PyTorch, un Random Forest
+y una regresión logística multinomial.
 
 ## Puesta en marcha
 

@@ -11,20 +11,31 @@ este orden estricto: **cuántos vehículos se transportan** y, como desempate,
 
 El óptimo exacto lo calcula un buscador propio por programación dinámica
 (`src/loading/labeler.py`, sin solvers externos), y ese óptimo es la etiqueta
-con la que se entrenan cuatro modelos: un MLP en Keras, XGBoost, LightGBM y un
-transformer en PyTorch.
+con la que se entrenan **seis modelos**: un MLP en Keras, XGBoost, LightGBM, un
+transformer en PyTorch, un Random Forest y una regresión logística multinomial.
 
-## Los cuatro modelos comparten todo menos el modelo
+## Dos formulaciones, un solo criterio de evaluación
 
-Los cuatro son **por pares**: puntúan cada opción `(vehículo, camión)` más la
-opción de diferir, produciendo logits `(V, 1 + T)` en el espacio canónico
-(columna 0 = `SIN_CAMION`, 1..T = camiones por capacidad descendente), y
-decodifican con un decodificador que respeta la capacidad. El eje de camiones es
-completamente dinámico: **ningún modelo tiene un número de camiones codificado**.
+**Cuatro modelos son por pares** —MLP, XGBoost, LightGBM y el transformer—:
+puntúan cada opción `(vehículo, camión)` más la opción de diferir, produciendo
+logits `(V, 1 + T)` en el espacio canónico (columna 0 = `SIN_CAMION`, 1..T =
+camiones por capacidad descendente). El eje de camiones es completamente
+dinámico: **ninguno tiene un número de camiones codificado**, y por eso
+extrapolan a flotas mayores sin reentrenar.
 
-Comparten los tensores de `src/modeling`, el decodificador, las métricas y —lo
-que hace que sus cifras sean comparables entre sí— **la partición**
-(`src/modeling/protocol.py`).
+**Los dos clásicos son de ancho fijo.** `RandomForestClassifier` y
+`LogisticRegression` son clasificadores de `K` clases fijas y no admiten un eje
+dinámico, así que la flota se rellena a un tamaño máximo y cada posición
+canónica es una columna más. El precio es que no generalizan por encima de ese
+tope —lanzan `ValueError` en vez de fallar callando—, cosa que no afecta a este
+dataset porque `N_TRUCKS_RANGE = (1, 4)` acota la flota en el propio generador.
+El detalle está en [modelos clásicos](modelo/modelos_clasicos.md).
+
+Lo que **los seis** comparten es lo que hace que la tabla signifique algo: los
+tensores de `src/modeling`, el decodificador que respeta la capacidad, las
+métricas de `src/modeling/metrics.py` y —lo decisivo— **la partición**
+(`src/modeling/protocol.py`). No hay una segunda implementación de las métricas
+para ningún modelo.
 
 Todo plan producido es **factible por construcción**: un vehículo solo se coloca
 si cabe en la capacidad restante. La tasa de violación de capacidad es 0 para
@@ -58,12 +69,12 @@ Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos.
   [cobertura de escenarios](propuesta/09_scenarios_coverage.md).
 - **Latencia** es el tiempo del decodificador (`decode_episode`), el único paso
   que los modelos comparten; el ensamblado de los logits es específico de cada
-  uno, y por eso el MLP no tiene fila aquí (ver la nota de la tabla).
+  uno, y por eso hay celdas vacías (ver la nota de la tabla).
 - **Greedy** es la heurística de primer ajuste por tamaño descendente: la línea
   base a batir. Su brecha de conteo, **0,63 vehículos por episodio frente a
   ~0,03**, es la diferencia que justifica el proyecto entero.
-- Los cuatro modelos rondan el **97 %** de episodios en los que igualan
-  exactamente al maestro, contra el 87,4 % del greedy.
+- Todos los modelos entrenados rondan el **97 %** de episodios en los que
+  igualan exactamente al maestro, contra el 87,4 % del greedy.
 
 Las fórmulas exactas están en [métricas operativas](metricas.md).
 
@@ -82,6 +93,11 @@ modelo):
 Con 5-6 camiones los tres igualan al maestro en el **100 %** de los episodios,
 sin reentrenar. Es la comprobación de que la estructura por pares generaliza más
 allá del rango visto en entrenamiento.
+
+Los dos modelos clásicos **no aparecen en esta tabla y no pueden aparecer**: con
+la flota rellenada a ancho fijo, un episodio de 5 camiones queda fuera de su
+dominio de definición. Es el precio concreto de la formulación multiclase, y
+medirlo aquí es la forma de no olvidarlo.
 
 Agregados completos por modelo en
 `artifacts/fleet_loading/<modelo>/extrap_*_metrics.json`.
@@ -105,11 +121,16 @@ uv run python scripts/build_scenarios.py --limit 200
 uv run python scripts/train_mlp.py
 uv run python scripts/evaluate_mlp.py
 
-# 4. Los otros tres modelos (pipeline Kedro). Necesitan sus extras:
+# 4. Los dos clásicos (RF y regresión logística). Sin extras: scikit-learn y
+#    optuna son dependencias base.
+uv run python scripts/train_classical.py --model rf --split time   # o: just train-rf
+uv run python scripts/train_classical.py --model logreg --split time
+
+# 5. Los otros tres modelos (pipeline Kedro). Necesitan sus extras:
 uv sync --extra gbt --extra attention --extra kedro
 cd fleet_loading && uv run --project .. kedro run     # o: just train-fleet
 
-# 5. MLflow (una sola base en la raíz, compartida por todos los entrenamientos)
+# 6. MLflow (una sola base en la raíz, compartida por todos los entrenamientos)
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 
 # 6. Documentación

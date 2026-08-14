@@ -7,7 +7,7 @@ pipeline Kedro que consume ese núcleo.
 ## `src/loading/` — el maestro exacto
 
 La verdad de referencia de todo el proyecto. No es un modelo: es una búsqueda
-exacta que calcula el óptimo con el que se entrenan los cuatro modelos.
+exacta que calcula el óptimo con el que se entrenan los seis modelos.
 
 | Módulo | Qué hace |
 |---|---|
@@ -19,7 +19,7 @@ regresiones deliberadas, no solo que pasan en verde.
 
 ## `src/modeling/` — el núcleo compartido
 
-Todo lo que los cuatro modelos tienen en común. Ningún modelo reimplementa nada
+Todo lo que los seis modelos tienen en común. Ningún modelo reimplementa nada
 de esto.
 
 | Módulo | Qué hace |
@@ -29,7 +29,8 @@ de esto.
 | `capacity_decoder.py` | `decode_episode` — decodificador voraz que respeta la capacidad. El plan es factible por construcción: un vehículo solo se coloca si cabe |
 | `metrics.py` | Métricas por episodio contra el maestro exacto, más la línea base greedy |
 | `dataset.py` | Carga de episodios y `assert_no_episode_leakage` |
-| `protocol.py` | **El único sitio donde se construye una partición.** Holdout temporal compartido por los cuatro modelos |
+| `protocol.py` | **El único sitio donde se construye una partición.** Holdout temporal compartido por los seis modelos |
+| `flat_features.py` | Aplana los tensores por par a una fila de ancho fijo, para los clasificadores multiclase de scikit-learn. Ver [modelos clásicos](modelo/modelos_clasicos.md) |
 | `mlp_classifier.py` | El MLP en Keras |
 
 ## `src/pipeline/` y `src/profiler/` — ingesta y perfilado

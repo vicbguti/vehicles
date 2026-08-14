@@ -20,6 +20,15 @@
     [inicio](../index.md), generada por `scripts/report_model_table.py`
     desde los JSON medidos, no escrita a mano.
 
+    **Y ya no son cinco.** El 14 de agosto se integraron un Random Forest y
+    una regresión logística multinomial
+    ([modelos clásicos](../modelo/modelos_clasicos.md)), que entran a la misma
+    tabla por la misma puerta: `training_report.json` declara su
+    `split_strategy` y el generador **rechaza publicar** una fila medida con
+    otra partición. Que sumar dos modelos no haya costado una segunda
+    implementación de las métricas es la prueba de que lo que este documento
+    proponía en §3 era lo correcto.
+
     Una salvedad que este documento no había anticipado: la **latencia**
     del MLP sigue sin ser comparable, porque `evaluate_mlp.py` cronometra
     la inferencia completa y el pipeline Kedro solo `decode_episode`. Esa

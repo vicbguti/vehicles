@@ -31,7 +31,7 @@ lleva escrita su justificación; el detalle está en
 [arquitectura del MLP](modelo/arquitectura_mlp.md).
 
 La sección `data` fija la **partición temporal** (entrenamiento 2018-2024,
-validación 2025, prueba 2026), que hoy comparten los cuatro modelos a través de
+validación 2025, prueba 2026), que hoy comparten los seis modelos a través de
 `src/modeling/protocol.py`. Ver
 [protocolo de partición](decisiones/04_protocolo_de_particion.md).
 

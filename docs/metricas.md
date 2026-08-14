@@ -5,10 +5,11 @@ contra el **maestro exacto** de `data/episodes/episodes.parquet`, que lleva
 `n_loaded` y `cu_utilized` por episodio (es decir, `V_exact` para cada
 manifiesto).
 
-Los cuatro modelos se evalúan sobre **la misma partición**: el holdout temporal
+Los seis modelos se evalúan sobre **la misma partición**: el holdout temporal
 de `src/modeling/protocol.py` (entrenamiento 2018-2024, validación 2025, prueba
 2026). La maquinaria es `src/modeling/metrics.py`, la misma que evalúa el MLP,
-a través de `fleet_loading/src/fleet_loading/pipelines/training/pairwise.py`.
+a través de `fleet_loading/src/fleet_loading/pipelines/training/pairwise.py` y
+de `scripts/train_classical.py`.
 
 !!! warning "Esta página decía otra cosa hasta agosto de 2026"
     Publicaba «6.968 episodios, GroupShuffleSplit por episode_id». Ese era el
@@ -94,7 +95,7 @@ Lo construye `src.modeling.metrics.build_result` a partir de `capacity_decoder.D
 Cada modelo se reporta frente a la **línea base greedy**
 (`src.modeling.metrics.evaluate_greedy`, primer ajuste por tamaño descendente),
 que es la heurística manual que la entrega pide batir. La tabla de
-[inicio](index.md) muestra que los cuatro modelos la superan por un margen
+[inicio](index.md) muestra que los seis modelos la superan por un margen
 amplio en el objetivo primario.
 
 ## En MLflow
