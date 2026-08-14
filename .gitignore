@@ -47,3 +47,4 @@ fleet_loading/data/0[4578]_*/
 .DS_Store
 .ipynb_checkpoints/
 site/
+mlruns/
