@@ -48,11 +48,16 @@ el proyecto. Detalle en [pipeline Kedro](pipeline_kedro.md).
 ## `scripts/` — entradas de línea de comandos
 
 `build_vehicle_features.py`, `build_scenarios.py`, `train_mlp.py`,
-`evaluate_mlp.py`, `sweep_mlp.py`, `label_ceiling.py`,
+`evaluate_mlp.py`, `sweep_mlp.py`, `train_classical.py`, `label_ceiling.py`,
 `teacher_self_agreement.py`, `build_extrapolation_set.py`,
-`evaluate_fleet_loading.py`, `compare_split_protocols.py`, y los tres
-orquestadores del perfilado y los reportes (`run_pipeline.py`,
-`run_profiling.py`, `run_reporting.py`).
+`evaluate_fleet_loading.py`, `compare_split_protocols.py`,
+`report_model_table.py`, y los tres orquestadores del perfilado y los reportes
+(`run_pipeline.py`, `run_profiling.py`, `run_reporting.py`).
+
+Dos que conviene conocer: `train_classical.py` entrena el Random Forest y la
+regresión logística ([modelos clásicos](modelo/modelos_clasicos.md)), y
+`report_model_table.py` **genera** la tabla comparativa desde los JSON medidos
+— con `--check` en CI, para que lo publicado no vuelva a divergir de lo medido.
 
 Cada uno añade la raíz del repositorio a `sys.path`, porque hoy no hay nada
 instalable. Es deuda conocida.

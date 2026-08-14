@@ -202,27 +202,55 @@ def construir_tabla() -> str:
         "`scripts/train_classical.py` no la cronometra. Son mediciones distintas y "
         "ponerlas en la misma columna las haría parecer comparables.\n\n"
         "Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos. "
-        "**No editar a mano**: se regenera, y `--check` lo verifica en CI."
+        "**No editar a mano**: se regenera con `--write`, y `--check` lo verifica en CI."
     )
     return MARCA_INICIO + "\n" + cabecera + "\n" + "\n".join(filas) + pie + "\n" + MARCA_FIN
 
 
+DOCS_CON_TABLA = ("index.md", "metricas.md")
+
+
+def _paginas() -> list[Path]:
+    return [REPO / "docs" / nombre for nombre in DOCS_CON_TABLA]
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument(
+    modo = p.add_mutually_exclusive_group()
+    modo.add_argument(
         "--check",
         action="store_true",
         help="Falla si la tabla publicada no coincide con las métricas medidas.",
     )
+    modo.add_argument(
+        "--write",
+        action="store_true",
+        help="Reescribe la tabla en docs/ entre las marcas. Es la forma de regenerarla.",
+    )
     args = p.parse_args()
 
     tabla = construir_tabla()
+
+    if args.write:
+        # Sustituir entre marcas en vez de copiar a mano: el pegado manual es
+        # justo el eslabón por el que la tabla se quedaba vieja.
+        for doc in _paginas():
+            texto = doc.read_text(encoding="utf-8")
+            if MARCA_INICIO not in texto:
+                print(f"aviso: {doc.relative_to(REPO)} no tiene marcas, se omite", file=sys.stderr)
+                continue
+            inicio = texto.index(MARCA_INICIO)
+            fin = texto.index(MARCA_FIN) + len(MARCA_FIN)
+            doc.write_text(texto[:inicio] + tabla + texto[fin:], encoding="utf-8")
+            print(f"escrita en {doc.relative_to(REPO)}")
+        return 0
+
     if not args.check:
         print(tabla)
         return 0
 
     desincronizados = []
-    for doc in (REPO / "docs" / "index.md", REPO / "docs" / "metricas.md"):
+    for doc in _paginas():
         texto = doc.read_text(encoding="utf-8")
         if MARCA_INICIO not in texto:
             continue
@@ -232,7 +260,7 @@ def main() -> int:
 
     if desincronizados:
         print("Tabla desincronizada en:", ", ".join(str(d) for d in desincronizados))
-        print("Regenera con: uv run python scripts/report_model_table.py")
+        print("Regenera con: uv run python scripts/report_model_table.py --write")
         return 1
     print("La tabla publicada coincide con las métricas medidas.")
     return 0

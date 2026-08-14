@@ -90,3 +90,8 @@ fleet-figures:
 
 mlflow:  # una sola base en la raíz: la comparten el pipeline y train_classical.py
     uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
+
+# Reescribe la tabla comparativa en docs/ desde los JSON medidos. CI verifica
+# con --check que lo publicado coincida con lo medido.
+model-table:
+    uv run python scripts/report_model_table.py --write
