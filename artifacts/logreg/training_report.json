@@ -1,7 +1,7 @@
 {
-  "generated": "2026-08-14 17:11 UTC",
+  "generated": "2026-08-16 19:45 UTC",
   "model": "logreg",
-  "episodes_dir": "/home/jfcofer/Documents/jfco/espol/2026_1/ia/proyecto/dev/project-repo/data/episodes",
+  "episodes_dir": "/home/jfcofer/Documents/jfco/espol/2026_1/ia/proyecto/project-repo/data/episodes",
   "split_strategy": "time",
   "episodes_dropped_non_optimal": 0,
   "splits": [
@@ -72,6 +72,8 @@
     "class_weight": null
   },
   "best_val_macro_f1": 0.8137138726131136,
+  "refit_from": "artifacts/logreg/training_report.json",
+  "curve_step_unit": "lbfgs_iter",
   "decoder_policy": "count",
   "domain_metrics": {
     "train": {
@@ -87,6 +89,7 @@
       "deferred_model_total": 19773,
       "deferred_teacher_total": 18903,
       "macro_f1": 0.7745647262550919,
+      "f1_defer": 0.6280897714344813,
       "raw_assignment_accuracy": 0.8026803227557195,
       "class_level_agreement_mean": 0.8697187447129697,
       "episodes_identical_to_teacher_pct": 59.9596967005943,
@@ -143,6 +146,7 @@
       "deferred_model_total": 2884,
       "deferred_teacher_total": 2750,
       "macro_f1": 0.7781528270570874,
+      "f1_defer": 0.6006389776357828,
       "raw_assignment_accuracy": 0.8110664317233693,
       "class_level_agreement_mean": 0.8839250130192482,
       "episodes_identical_to_teacher_pct": 65.31017369727047,
@@ -199,6 +203,7 @@
       "deferred_model_total": 1043,
       "deferred_teacher_total": 1000,
       "macro_f1": 0.7951788930524397,
+      "f1_defer": 0.6079295154185022,
       "raw_assignment_accuracy": 0.8299215848122162,
       "class_level_agreement_mean": 0.8976305792481758,
       "episodes_identical_to_teacher_pct": 69.69301110385369,
@@ -256,6 +261,7 @@
     "deferred_model_total": 5293,
     "deferred_teacher_total": 2750,
     "macro_f1": 0.18486315804760942,
+    "f1_defer": 0.32525177172696756,
     "raw_assignment_accuracy": 0.2717661410563412,
     "class_level_agreement_mean": 0.3012426012393747,
     "episodes_identical_to_teacher_pct": 17.990074441687344,
@@ -299,8 +305,8 @@
     "n_episodes": 4030,
     "n_vehicle_rows": 66399
   },
-  "search_seconds": 1304.9,
-  "mlflow_tracking_uri": "sqlite:////home/jfcofer/Documents/jfco/espol/2026_1/ia/proyecto/dev/project-repo/mlflow.db",
+  "search_seconds": 0.0,
+  "mlflow_tracking_uri": "sqlite:////home/jfcofer/Documents/jfco/espol/2026_1/ia/proyecto/project-repo/mlflow.db",
   "mlflow_experiment": "vehicles-logreg",
-  "mlflow_run_id": "20c4c33cb6dd406d95cb7df5d37c99ea"
+  "mlflow_run_id": "953788ad0c1941c4967f58bd79497cb8"
 }

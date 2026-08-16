@@ -33,9 +33,15 @@ El detalle está en [modelos clásicos](modelo/modelos_clasicos.md).
 
 Lo que **los seis** comparten es lo que hace que la tabla signifique algo: los
 tensores de `src/modeling`, el decodificador que respeta la capacidad, las
-métricas de `src/modeling/metrics.py` y —lo decisivo— **la partición**
-(`src/modeling/protocol.py`). No hay una segunda implementación de las métricas
-para ningún modelo.
+métricas de `src/modeling/metrics.py`, las figuras de `src/modeling/figures.py`
+y —lo decisivo— **la partición** (`src/modeling/protocol.py`). No hay una segunda
+implementación de las métricas para ningún modelo, y las seis filas de la tabla
+se leen del mismo bloque de agregados: `_exigir_misma_metrica` rechaza publicar
+una que traiga otras claves.
+
+Los seis dejan además su curva de convergencia y su matriz de confusión
+versionadas en `artifacts/<modelo>/`, sobre la misma partición de validación. Se
+redibujan sin reentrenar con `just figures`.
 
 Todo plan producido es **factible por construcción**: un vehículo solo se coloca
 si cabe en la capacidad restante. La tasa de violación de capacidad es 0 para
@@ -47,19 +53,21 @@ significa nada.
 Medido contra el maestro exacto sobre la validación del holdout temporal.
 
 <!-- INICIO tabla generada -->
-| Modelo | Exactitud | F1 diferir | Brecha de conteo | Iguala al maestro | Llenado (CU) | Violación cap. | Latencia media / p99 (ms) |
-|---|---|---|---|---|---|---|---|
-| **XGBoost** | 0,826 | 0,618 | 0,0288 | 97,2 % | 35,6 % | 0,0 | 0,04 / 0,07 |
-| **LightGBM** | 0,825 | 0,616 | 0,0268 | 97,4 % | 35,6 % | 0,0 | 0,04 / 0,07 |
-| **Transformer** | 0,857 | 0,699 | 0,0318 | 97,0 % | 35,5 % | 0,0 | 0,04 / 0,06 |
-| **MLP (Keras)** | 0,829 | 0,796 | 0,0266 | 97,4 % | 35,6 % | 0,0 | — / — |
-| **Random Forest** | 0,831 | 0,795 | 0,0320 | 96,9 % | 35,5 % | 0,0 | — / — |
-| **Regresión logística** | 0,811 | 0,778 | 0,0333 | 96,9 % | 35,5 % | 0,0 | — / — |
-| **Greedy (línea base)** | — | — | 0,6310 | 87,4 % | 36,2 % | 0,0 | 0,04 / 0,07 |
+| Modelo | Exactitud | F1 diferir | F1 macro | Brecha de conteo | Iguala al maestro | Llenado (CU) | Violación cap. | Latencia media / p99 (ms) |
+|---|---|---|---|---|---|---|---|---|
+| **XGBoost** | 0,827 | 0,618 | 0,794 | 0,0261 | 97,5 % | 35,6 % | 0,0 | 0,04 / 0,06 |
+| **LightGBM** | 0,823 | 0,616 | 0,790 | 0,0263 | 97,5 % | 35,6 % | 0,0 | 0,04 / 0,08 |
+| **Transformer** | 0,830 | 0,601 | 0,793 | 0,0313 | 97,0 % | 35,5 % | 0,0 | 0,04 / 0,06 |
+| **MLP (Keras)** | 0,829 | 0,624 | 0,796 | 0,0266 | 97,4 % | 35,6 % | 0,0 | — / — |
+| **Random Forest** | 0,831 | 0,602 | 0,795 | 0,0320 | 96,9 % | 35,5 % | 0,0 | — / — |
+| **Regresión logística** | 0,811 | 0,601 | 0,778 | 0,0333 | 96,9 % | 35,5 % | 0,0 | — / — |
+| **Greedy (línea base)** | 0,272 | 0,325 | 0,185 | 0,6310 | 87,4 % | 36,2 % | 0,0 | 0,04 / 0,06 |
 
-Medido sobre la validación del protocolo temporal (**4030 episodios**, año 2025) contra el maestro exacto.
+Medido sobre la validación del protocolo temporal (**4030 episodios**, año 2025) contra el maestro exacto. Las nueve columnas salen del mismo bloque de agregados de `src/modeling/metrics.py`, **después del decodificador**, para los seis modelos y para el greedy.
 
-La **latencia se omite a propósito** en el MLP, Random Forest y la regresión logística. `scripts/evaluate_mlp.py` cronometra la inferencia completa (`model.predict` + decodificación, ~43 ms, dominada por la sobrecarga de Keras), el pipeline Kedro cronometra solo `decode_episode` (~0,04 ms) y `scripts/train_classical.py` no la cronometra. Son mediciones distintas y ponerlas en la misma columna las haría parecer comparables.
+**F1 diferir** y **F1 macro** van en columnas separadas porque son métricas distintas y no intercambiables: la primera mide la clase minoritaria —dejar un vehículo en el andén—, la segunda promedia las cinco clases y por eso sale ~0,17 más alta. Cualquiera de las dos se puede reconstruir desde la matriz de confusión que publica cada modelo en su JSON.
+
+La **latencia se omite a propósito** en el MLP, Random Forest y la regresión logística. `scripts/evaluate_mlp.py` cronometra la inferencia completa (`model.predict` + decodificación, ~40 ms, dominada por la sobrecarga de Keras), el pipeline Kedro cronometra solo `decode_episode` (~0,04 ms) y `scripts/train_classical.py` no la cronometra. Son mediciones distintas y ponerlas en la misma columna las haría parecer comparables.
 
 Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos. **No editar a mano**: se regenera con `--write`, y `--check` lo verifica en CI.
 <!-- FIN tabla generada -->
@@ -69,6 +77,12 @@ Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos.
   episodios son ricos en capacidad —sobra sitio en los camiones—, así que
   maestro y modelos convergen al mismo valor. Ver
   [cobertura de escenarios](propuesta/09_scenarios_coverage.md).
+- **F1 diferir** y **F1 macro** son columnas distintas y no intercambiables. La
+  primera mide la clase que importa —dejar un vehículo en el andén—; la segunda
+  promedia las cinco y sale ~0,17 más alta porque las cuatro de camión, dos
+  órdenes de magnitud más frecuentes, diluyen la de diferir. Hasta agosto de 2026
+  la tabla mezclaba las dos en una sola columna, con tres filas de cada; ver
+  [métricas](metricas.md#agregados-aggregate).
 - **Latencia** es el tiempo del decodificador (`decode_episode`), el único paso
   que los modelos comparten; el ensamblado de los logits es específico de cada
   uno, y por eso hay celdas vacías (ver la nota de la tabla).
