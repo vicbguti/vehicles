@@ -20,8 +20,16 @@ repos:
       - id: check-merge-conflict
       - id: check-case-conflict
       # Los modelos y CSV grandes deben ir por Git LFS, no como blobs.
+      #
+      # `data/episodes/` es la única excepción y va como blob normal a propósito:
+      # es el conjunto de ejemplos que la entrega exige tener cargado, y mandarlo
+      # a LFS obligaría a un `git lfs pull` para reproducir el entrenamiento --lo
+      # contrario de lo que se busca--. Son 11 MB que cambian muy de vez en
+      # cuando. El límite global se deja en 1 MB, que es lo que sigue empujando
+      # los binarios de modelo hacia LFS.
       - id: check-added-large-files
         args: ["--maxkb=1024"]
+        exclude: '^data/episodes/.*\.parquet$'
 
   - repo: local
     hooks:

@@ -42,13 +42,38 @@ etiqueta y también la referencia contra la que se mide cada modelo.
 
 ### Conjuntos de extrapolación
 
-`extrap_5_6_same`, `extrap_8_10_same` y `extrap_8_10_constanttotal` son
-manifiestos re-etiquetados con flotas mayores que las vistas en entrenamiento
-(1-4 camiones). Los produce `scripts/build_extrapolation_set.py` y sirven para
-comprobar que el diseño por pares generaliza a cualquier número de camiones.
+Siete conjuntos, en dos ejes, todos producidos por
+`scripts/build_extrapolation_set.py`. Miden qué pasa fuera del sobre de
+entrenamiento —1-4 camiones y hasta 20 vehículos— cambiando **una sola variable
+por conjunto**. Resultados en
+[resultados del MLP §6](modelo/resultados.md#6-generalizacion-fuera-del-sobre-de-entrenamiento).
+
+| Conjunto | Eje | Qué cambia |
+|---|---|---|
+| `extrap_5_6_same`, `extrap_8_10_same`, `extrap_8_10_constanttotal` | camiones | Mismos manifiestos, flota mayor, reetiquetados por el maestro |
+| `extrap_maxn_25`, `_30`, `_40`, `_50` | tamaño de manifiesto | Se reconstruyen desde `data/features/` con un tope mayor de vehículos |
 
 ## Qué está versionado y qué no
 
-`data/clean/` va en Git LFS. `data/features/` y `data/episodes/` están en
-`.gitignore`: son derivados reproducibles y regenerarlos es más barato que
-versionarlos.
+| Ruta | Cómo | Tamaño |
+|---|---|---|
+| `data/clean/` | Git LFS | 535 MB |
+| `data/episodes/` | **blobs normales** | 11 MB |
+| `data/features/` | `.gitignore` | 29 MB |
+
+`data/episodes/` se versiona porque es el **conjunto de ejemplos** con el que se
+entrenan y evalúan los seis modelos, y la entrega pide que esté cargado en el
+remoto. Estuvo excluido bajo la regla genérica de «no commitear datasets
+grandes», que a 11 MB no aplica.
+
+Va como blob normal y **no** por LFS a propósito: el objetivo es que clonar baste
+para reproducir el entrenamiento, y mandarlo a LFS reintroduciría el `git lfs
+pull` obligatorio. Con los episodios en el clon, ni `data/clean/` ni los ~30 min
+de `build_scenarios.py` hacen falta para entrenar. El hook
+`check-added-large-files` corta en 1 MB y tiene una excepción acotada a
+`data/episodes/*.parquet`; el límite global sigue vigente para todo lo demás, que
+es lo que empuja los binarios de modelo hacia LFS.
+
+`data/features/` sigue fuera: es un paso intermedio que sólo hace falta para
+**reconstruir** los episodios (o para generar el eje de extrapolación por tamaño
+de manifiesto), no para usarlos.
