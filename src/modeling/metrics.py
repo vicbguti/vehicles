@@ -15,9 +15,24 @@ Por eso el orden de reporte es el del dominio:
 2. brecha de vehículos cargados frente al maestro (objetivo primario);
 3. brecha de CU aprovechada (objetivo secundario);
 4. vehículos diferidos;
-5. F1 macro y matriz de confusión;
+5. F1 de diferir, F1 macro y matriz de confusión;
 6. latencia de inferencia;
 7. exactitud cruda, como diagnóstico.
+
+Una sola definición por métrica
+-------------------------------
+`aggregate()` es el único sitio donde se calcula cualquier cifra publicable, y
+los seis modelos del proyecto pasan por aquí --el MLP vía `evaluate_mlp.py`, los
+dos clásicos vía `train_classical.py`, y XGBoost, LightGBM y el transformer vía
+`fleet_loading.pipelines.training.pairwise.evaluate_split`--. No es organización
+por gusto: las métricas *operativas* se unificaron y las de clasificación no, y
+durante meses la tabla comparativa publicó `f1_defer` en tres filas y `macro_f1`
+en las otras tres bajo el mismo encabezado. Toda métrica nueva se añade aquí,
+nunca en quien llama.
+
+Todo lo que sale de aquí se mide **después del decodificador**, sobre el plan que
+se ejecutaría de verdad. Un argmax crudo sobre los logits es otra cosa y no entra
+a la misma tabla.
 
 El maestro ya dejó `n_loaded` y `cu_utilized` por episodio en `episodes.parquet`,
 así que la verdad de terreno no cuesta nada recalcularla.
@@ -39,6 +54,12 @@ from src.modeling.capacity_decoder import (
 from src.modeling.features import EpisodeTensors, ModelArrays
 
 _TOL = 1e-9
+
+# Índice canónico de SIN_CAMION. `canonicalization.py` reserva el 0 para diferir
+# y deja 1..T para los camiones por capacidad descendente; aquí se nombra porque
+# el 0 suelto aparecía repetido por el módulo y `fleet_loading` mantenía su
+# propia copia de la constante.
+DEFER_INDEX = 0
 
 
 @dataclass(frozen=True)
@@ -286,6 +307,33 @@ def _macro_f1(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float]:
     )
 
 
+def _f1_defer(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """F1 de la clase «diferir» (índice canónico 0) contra todo lo demás.
+
+    Es la métrica que más importa del clasificador: diferir es la clase
+    minoritaria y la única cuyo error tiene coste operativo asimétrico --dejar un
+    vehículo en el andén no es lo mismo que ponerlo en otro camión--.
+
+    Definida como F1 binaria de «es diferir», que es idénticamente el F1 de la
+    fila/columna 0 de `confusion()`. Esa equivalencia es lo que permite
+    reconciliar cualquier cifra publicada contra la matriz que se publica a su
+    lado, y está fijada por prueba en `tests/modeling/test_metrics.py`.
+
+    `macro_f1` NO sirve para esto y publicarlo en su lugar es el error que se
+    corrigió: promedia las cinco clases, así que las cuatro de camión --dos
+    órdenes de magnitud más frecuentes-- diluyen justo lo que se quería medir.
+    """
+    from sklearn.metrics import f1_score
+
+    return float(
+        f1_score(
+            (y_true == DEFER_INDEX).astype(int),
+            (y_pred == DEFER_INDEX).astype(int),
+            zero_division=0,
+        )
+    )
+
+
 def confusion(results: list[EpisodeResult], n_labels: int) -> list[list[int]]:
     """Matriz de confusión sobre índices canónicos (fila = maestro)."""
     matrix = np.zeros((n_labels, n_labels), dtype=int)
@@ -330,10 +378,21 @@ def aggregate(results: list[EpisodeResult], n_labels: int) -> dict:
         "cu_utilization_model_pct": float(100.0 * model_cu.sum() / capacity.sum()),
         "cu_utilization_teacher_pct": float(100.0 * teacher_cu.sum() / capacity.sum()),
         # 4. Diferidos.
-        "deferred_model_total": int(sum(int((r.predicted_index == 0).sum()) for r in results)),
-        "deferred_teacher_total": int(sum(int((r.target_index == 0).sum()) for r in results)),
+        "deferred_model_total": int(
+            sum(int((r.predicted_index == DEFER_INDEX).sum()) for r in results)
+        ),
+        "deferred_teacher_total": int(
+            sum(int((r.target_index == DEFER_INDEX).sum()) for r in results)
+        ),
         # 5. Métricas de clasificación (secundarias).
+        #
+        # Las dos se publican, y por separado: `f1_defer` es la clase que
+        # importa y `macro_f1` el promedio sobre las cinco. Durante un tiempo la
+        # tabla comparativa llenó una sola columna con la una o la otra según de
+        # qué modelo viniera la fila; separarlas aquí es lo que hace que no se
+        # puedan volver a confundir aguas abajo.
         "macro_f1": macro_f1,
+        "f1_defer": _f1_defer(y_true, y_pred),
         "raw_assignment_accuracy": accuracy,
         **class_level_agreement(results),
         "confusion_matrix": confusion(results, n_labels),

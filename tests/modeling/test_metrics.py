@@ -147,3 +147,78 @@ def test_el_greedy_de_referencia_tambien_es_factible():
 def test_agregar_sin_resultados_falla():
     with pytest.raises(ValueError, match="No hay resultados"):
         aggregate([], 5)
+
+
+# --- F1 de diferir --------------------------------------------------------
+#
+# La tabla comparativa publicó durante meses `f1_defer` en tres filas y
+# `macro_f1` en las otras tres bajo el mismo encabezado «F1 diferir». Nadie lo
+# vio porque las dos son plausibles y del mismo orden de magnitud. Lo que sigue
+# ata la cifra a la matriz de confusión que se publica a su lado, que es la única
+# comprobación que lo habría detectado.
+
+
+def _f1_de_la_clase(matriz: list[list[int]], clase: int) -> float:
+    """F1 de una clase reconstruido SÓLO desde la matriz de confusión.
+
+    Deliberadamente no usa sklearn ni nada de `metrics.py`: si compartiera
+    implementación con lo que verifica, no verificaría nada.
+    """
+    tp = matriz[clase][clase]
+    fn = sum(matriz[clase]) - tp
+    fp = sum(fila[clase] for fila in matriz) - tp
+    if tp == 0:
+        return 0.0
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    return 2 * precision * recall / (precision + recall)
+
+
+def _episodios_con_error() -> tuple[list, object, np.ndarray]:
+    """Un caso donde el modelo se equivoca: si acertara todo, F1 sería 1 y la
+    prueba pasaría con cualquier definición de F1."""
+    spec = [
+        (
+            f"E{i}",
+            [
+                (f"v{i}_{j}", "CAMIONETA", 1.4, "CAMION_1" if j % 3 else "SIN_CAMION")
+                for j in range(6)
+            ],
+            [4.2, 2.8],
+        )
+        for i in range(8)
+    ]
+    episodes, arrays = _prepare(spec)
+    rng = np.random.default_rng(20260816)
+    logits = rng.normal(scale=3.0, size=(len(arrays.target), arrays.max_trucks + 1))
+    return episodes, arrays, logits
+
+
+def test_el_f1_de_diferir_reconcilia_con_su_matriz_de_confusion():
+    episodes, arrays, logits = _episodios_con_error()
+    n_labels = arrays.max_trucks + 1
+    m = aggregate(evaluate_model(episodes, arrays, logits), n_labels)
+
+    assert m["f1_defer"] == pytest.approx(_f1_de_la_clase(m["confusion_matrix"], 0))
+
+
+def test_el_f1_de_diferir_no_es_el_f1_macro():
+    """Son métricas distintas, y por eso no pueden compartir columna.
+
+    Sin esta prueba, publicar `macro_f1` bajo el encabezado «F1 diferir» seguiría
+    dando un número creíble.
+    """
+    episodes, arrays, logits = _episodios_con_error()
+    n_labels = arrays.max_trucks + 1
+    m = aggregate(evaluate_model(episodes, arrays, logits), n_labels)
+
+    assert m["f1_defer"] != pytest.approx(m["macro_f1"])
+    # Y `macro_f1` es la media de las F1 de todas las clases presentes, una de
+    # las cuales es la de diferir: eso es lo que la diluye.
+    presentes = [
+        c
+        for c in range(n_labels)
+        if sum(m["confusion_matrix"][c]) or sum(f[c] for f in m["confusion_matrix"])
+    ]
+    esperado = sum(_f1_de_la_clase(m["confusion_matrix"], c) for c in presentes) / len(presentes)
+    assert m["macro_f1"] == pytest.approx(esperado)
