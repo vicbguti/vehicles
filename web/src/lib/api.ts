@@ -52,9 +52,12 @@ export async function distributeVehicles(
       cu: v.cu,
       canton: v.canton,
     }))
-  const payload = await request<DistributionPlan>("/distribute", {
+  const payload = await request<{
+    trucks: DistributionPlan["trucks"]
+    sin_camion: { vehicles: Vehicle[] }
+  }>("/distribute", {
     vehicles: accepted,
     fleet,
   })
-  return payload
+  return { trucks: payload.trucks, sinCamion: payload.sin_camion.vehicles }
 }
