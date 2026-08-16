@@ -169,8 +169,8 @@ cd fleet_loading && uv run --project .. kedro run     # o: just train-fleet
 # 6. MLflow (una sola base en la raíz, compartida por todos los entrenamientos)
 uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 
-# 7. Documentación
-uv run --extra docs mkdocs serve
+# 7. Documentación (puerto 8001: el API de distribución ocupa el 8000)
+uv run --extra docs mkdocs serve -a 127.0.0.1:8001
 ```
 
 Con [`just`](https://github.com/casey/just) instalado, `just setup` hace el paso

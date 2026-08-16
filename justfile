@@ -38,8 +38,10 @@ check: lint format-check test
 
 # --- documentación --------------------------------------------------------
 
+# Puerto 8001 a propósito: el API de distribución ocupa el 8000 (ver src/api/main.py),
+# así que `just docs` y la API pueden correr en paralelo.
 docs:
-    uv run --extra docs mkdocs serve
+    uv run --extra docs mkdocs serve -a 127.0.0.1:8001
 
 docs-build:
     uv run --extra docs mkdocs build --strict

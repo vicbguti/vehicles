@@ -100,7 +100,7 @@ el transformer se entrena en CPU y las ruedas de CUDA son varios GB inútiles.
 
 ```bash
 just check        # ruff check + ruff format --check + pytest
-just docs         # sitio MkDocs en local
+just docs         # sitio MkDocs en local (http://127.0.0.1:8001)
 just docs-build   # mkdocs build --strict: falla ante cualquier enlace roto
 just --list       # todas las recetas
 ```
