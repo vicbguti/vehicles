@@ -7,8 +7,15 @@ split:
   test_years: [2026]
 
 
+# Semilla común a los tres modelos. Sin ella el entrenamiento era irreproducible
+# por vías distintas en cada uno --`subsample`/`colsample_bytree` en los GBT;
+# inicialización, dropout y el `shuffle` del DataLoader en el transformer--, así
+# que las cifras publicadas no se podían volver a obtener y una diferencia entre
+# modelos no se distinguía de la varianza entre corridas.
+
 xgboost:
   run_name: xgboost_baseline
+  seed: 42
   max_depth: 5
   learning_rate: 0.1
   n_estimators: 500
@@ -20,6 +27,7 @@ xgboost:
 
 lightgbm:
   run_name: lightgbm_baseline
+  seed: 42
   num_leaves: 15
   learning_rate: 0.1
   n_estimators: 500
@@ -30,6 +38,7 @@ lightgbm:
 
 attention:
   run_name: attention_baseline
+  seed: 42
   d_model: 64
   nhead: 4
   num_layers: 3

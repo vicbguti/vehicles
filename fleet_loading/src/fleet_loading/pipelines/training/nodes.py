@@ -42,6 +42,7 @@ from fleet_loading.pipelines.training.pairwise import (  # noqa: E402
     select_policy,
     stack_episode_logits,
 )
+from src.modeling.figures import PRESENTACION  # noqa: E402
 from src.modeling.metrics import evaluate_model  # noqa: E402
 from src.modeling.protocol import SplitConfig, make_splits  # noqa: E402
 
@@ -49,6 +50,11 @@ from src.modeling.protocol import SplitConfig, make_splits  # noqa: E402
 # by capacity descending. No hardcoded truck count: the models are pairwise and
 # accept any T.
 DEFER_LABEL = 0
+
+# Prefijo de clave -> subdirectorio bajo artifacts/fleet_loading/, que es también
+# la clave del registro `PRESENTACION` de src/modeling/figures.py (de donde salen
+# los rótulos). Estaba implícito, escrito a mano en cada `_save_model_artifact`.
+MODEL_DIRS = {"xgb": "xgboost", "lgb": "lightgbm", "att": "attention"}
 
 
 def _compute_defer_f1(y_true, y_pred) -> float:
@@ -61,7 +67,7 @@ def _compute_defer_f1(y_true, y_pred) -> float:
 
 
 def _log_gbt_curves(model, metric_name: str, error_metric: str, prefix: str) -> None:
-    """Re-log a GBT's train/val loss and accuracy curves under clear MLflow names.
+    """Re-log a GBT's train/val curves to MLflow *and* persist them under artifacts/.
 
     Both XGBoost and LightGBM record per-round eval results in ``evals_result``
     keyed as ``validation_0``/``validation_1`` (XGB) or ``training``/``valid_1``
@@ -69,6 +75,12 @@ def _log_gbt_curves(model, metric_name: str, error_metric: str, prefix: str) -> 
     them as ``<prefix>_train_<metric>`` / ``<prefix>_val_<metric>`` so the MLflow
     UI is unambiguous. Accuracy is logged as ``1 - error`` from the framework's
     error metric.
+
+    MLflow alone was not enough: the tracking DB is gitignored, and when it was
+    reset the curves of all three Kedro models ceased to exist -- their run_ids
+    no longer resolve. The CSV and PNG go next to the model, which is versioned.
+    The step axis here is a **boosting round**, not an epoch; ``write_history``
+    records that in the file so no chart can mislabel it.
     """
     result = getattr(model, "evals_result", None)
     result = result() if callable(result) else getattr(model, "_evals_result", None)
@@ -76,16 +88,34 @@ def _log_gbt_curves(model, metric_name: str, error_metric: str, prefix: str) -> 
         return
     train_series = result.get("validation_0") or result.get("training")
     val_series = result.get("validation_1") or result.get("valid_1") or result.get("valid_0")
+    curvas: dict[str, list[float]] = {}
     for name, series in (("train", train_series), ("val", val_series)):
         if not series:
             continue
         loss = series.get(metric_name) or next(iter(series.values()))
         for step, v in enumerate(loss):
             mlflow.log_metric(f"{prefix}_{name}_{metric_name}", v, step=step)
+        curvas["loss" if name == "train" else "val_loss"] = list(loss)
         error = series.get(error_metric)
         if error:
             for step, v in enumerate(error):
                 mlflow.log_metric(f"{prefix}_{name}_accuracy_curve", 1.0 - v, step=step)
+            clave = "accuracy" if name == "train" else "val_accuracy"
+            curvas[clave] = [1.0 - v for v in error]
+
+    if curvas:
+        _persistir_curvas(curvas, MODEL_DIRS[prefix])
+
+
+def _persistir_curvas(curvas: dict[str, list[float]], clave: str) -> None:
+    """Escribe training_history.csv + learning_curves.png bajo artifacts/."""
+    from src.modeling.figures import plot_model_curves, write_history
+
+    n = min(len(v) for v in curvas.values())
+    filas = [{k: float(v[i]) for k, v in curvas.items()} for i in range(n)]
+    out_dir = ARTIFACT_ROOT / clave
+    write_history(out_dir / "training_history.csv", filas, "boosting_round")
+    plot_model_curves(clave, filas, "boosting_round", out_dir)
 
 
 def _balanced_sample_weight(y: pd.Series) -> np.ndarray:
@@ -109,36 +139,20 @@ def _log_operational(operational: dict, prefix: str) -> None:
 
 
 def _confusion_matrix_figure(
-    y_true, y_pred, title: str, normalized: bool = False
+    y_true, y_pred, title: str, out_path: Path | None = None
 ) -> matplotlib.figure.Figure:
-    """Render a per-truck confusion matrix over canonical indices.
+    """Matriz de confusión sobre índices canónicos, con el renderizador común.
 
-    Labels are dynamic: ``Sin camión`` + one column per truck index actually
-    present, where index ``i`` is the ``i``-th largest truck of its episode
-    (canonicalization). Never depends on a fixed truck count.
+    Se dibuja con `src.modeling.figures.plot_confusion_matrix`, el mismo que usan
+    el MLP y los dos clásicos: antes había tres implementaciones distintas y sólo
+    una normalizaba por fila, así que las figuras de los seis modelos no se
+    podían poner una al lado de otra.
     """
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-    from sklearn.metrics import ConfusionMatrixDisplay
+    from src.modeling.figures import etiquetas_canonicas, plot_confusion_matrix
 
     k = int(max(y_true.max(), y_pred.max()))
-    labels = [f"Cam{i + 1}" for i in range(k)] + ["Sin camión"]
-    cm = confusion_matrix(
-        y_true,
-        y_pred,
-        labels=list(range(k + 1)),
-        normalize="true" if normalized else None,
-    )
-    disp = ConfusionMatrixDisplay(cm, display_labels=labels)
-    fig, ax = plt.subplots(figsize=(7, 6))
-    disp.plot(ax=ax, cmap="Blues", colorbar=False)
-    ax.set_title(title)
-    ax.set_xlabel("Predicción (truck asignado)")
-    ax.set_ylabel("Real (truck asignado)")
-    ax.tick_params(axis="x", rotation=45)
-    return fig
+    cm = confusion_matrix(y_true, y_pred, labels=list(range(k + 1)))
+    return plot_confusion_matrix(cm.tolist(), etiquetas_canonicas(k + 1), title, out_path)
 
 
 def _prediction_rows(results, split: str) -> pd.DataFrame:
@@ -159,9 +173,22 @@ def report_confusion_matrices(
     xgb_results: dict = None,
     lgb_results: dict = None,
 ) -> dict:
-    """Render all confusion matrices from cached predictions. Pure function:
-    figures depend only on (y_true, y_pred), never on retraining. Also
-    overwrites the model runs' ``confusion_matrix.png`` with a readable version."""
+    """Render the pipeline's confusion matrices from cached predictions. Pure
+    function: figures depend only on (y_true, y_pred), never on retraining.
+
+    **These go to the Kedro catalog only.** The versioned figure under
+    ``artifacts/<modelo>/confusion_matrix.png`` is written by
+    ``scripts/report_figures.py``, from the ``confusion_matrix`` inside each
+    model's results JSON -- the same numbers the comparison table publishes.
+
+    One writer per file, and the reason is measured: for the transformer these
+    two sources disagree on 200 of 66.399 rows. ``att_predictions`` comes from
+    ``predict_with_capacity``, which decodes over the **float32** batch tensors,
+    while the operational report decodes the same episodes in **float64**, so the
+    capacity check flips on the margin (the ~1e-7 ``max_overflow_cu`` documented
+    in docs/metricas.md). Neither is wrong, but if both wrote the same PNG the
+    figure would contradict the table depending on which ran last.
+    """
     figs = {}
     for split in ("train", "val"):
         for prefix, preds in (("xgb", xgb_predictions), ("lgb", lgb_predictions)):
@@ -169,15 +196,16 @@ def report_confusion_matrices(
             figs[f"{prefix}_confusion_matrix_{split}"] = _confusion_matrix_figure(
                 sub["y_true"],
                 sub["y_pred"],
-                f"{prefix} confusion matrix ({split})",
+                f"{PRESENTACION[MODEL_DIRS[prefix]].etiqueta} — "
+                f"{'validación' if split == 'val' else 'entrenamiento'}",
             )
     figs["att_confusion_matrix_val"] = _confusion_matrix_figure(
         att_predictions["y_true"],
         att_predictions["y_pred"],
-        "attention capacity-aware confusion matrix (val)",
+        PRESENTACION[MODEL_DIRS["att"]].titulo_matriz,
     )
 
-    for _prefix, preds, results in (
+    for prefix, preds, results in (
         ("xgb", xgb_predictions, xgb_results or {}),
         ("lgb", lgb_predictions, lgb_results or {}),
     ):
@@ -186,10 +214,7 @@ def report_confusion_matrices(
             continue
         val = preds[preds["split"] == "val"]
         fig = _confusion_matrix_figure(
-            val["y_true"],
-            val["y_pred"],
-            "Normalized confusion matrix",
-            normalized=True,
+            val["y_true"], val["y_pred"], PRESENTACION[MODEL_DIRS[prefix]].titulo_matriz
         )
         with mlflow.start_run(run_id=run_id):
             mlflow.log_figure(fig, "confusion_matrix.png")
@@ -290,6 +315,7 @@ def train_xgboost(
     min_child_weight: int,
     scale_pos_weight: float,
     max_delta_step: int,
+    seed: int,
     run_name: str,
 ) -> dict:
     import mlflow.xgboost
@@ -312,6 +338,10 @@ def train_xgboost(
         "objective": "binary:logistic",
         "eval_metric": ["logloss", "error"],
         "verbosity": 0,
+        # `subsample` y `colsample_bytree` muestrean en cada ronda: sin semilla,
+        # dos corridas con los mismos datos daban cifras distintas y la tabla
+        # publicada no se podía reproducir.
+        "random_state": seed,
     }
     sample_weight = _balanced_sample_weight(pd.Series(y))
 
@@ -360,8 +390,8 @@ def train_xgboost(
         }
         _log_operational(operational, "xgb")
 
-        mlflow.log_metric("xgb_val_accuracy", acc)
-        mlflow.log_metric("xgb_val_defer_f1", f1)
+        mlflow.log_metric("xgb_rawrow_accuracy", acc)
+        mlflow.log_metric("xgb_rawrow_defer_f1", f1)
         mlflow.log_param("xgb_decoder_policy", policy)
         mlflow.sklearn.log_model(model, "model", serialization_format="pickle")
         _save_model_artifact("xgboost", model, scaler, classes, train_arrays.max_trucks)
@@ -382,10 +412,17 @@ def train_xgboost(
 
         return {
             "xgb_results": {
-                "xgb_val_accuracy": acc,
-                "xgb_val_defer_f1": f1,
+                # Diagnóstico del clasificador crudo, no cifra publicable: la
+                # tabla lee `xgb_operational.model`, igual que las otras cinco filas.
+                "xgb_rawrow_accuracy": acc,
+                "xgb_rawrow_defer_f1": f1,
                 "xgb_operational": operational,
                 "xgb_decoder_policy": policy,
+                # La tabla comparativa rechaza publicar una fila que no declare
+                # su partición. Estas tres fuentes estaban exentas por no traer
+                # la clave, que es medio agujero en la puerta que la vigila.
+                "split_strategy": "time",
+                "seed": seed,
                 "run_id": run_id,
             },
             "xgb_predictions": predictions,
@@ -403,6 +440,7 @@ def train_lightgbm(
     colsample_bytree: float,
     min_child_samples: int,
     scale_pos_weight: float,
+    seed: int,
     run_name: str,
 ) -> dict:
     import lightgbm as lgb
@@ -424,6 +462,7 @@ def train_lightgbm(
         "min_child_samples": min_child_samples,
         "objective": "binary",
         "verbosity": -1,
+        "random_state": seed,  # mismo motivo que en XGBoost
     }
     sample_weight = _balanced_sample_weight(pd.Series(y))
 
@@ -473,8 +512,8 @@ def train_lightgbm(
         }
         _log_operational(operational, "lgb")
 
-        mlflow.log_metric("lgb_val_accuracy", acc)
-        mlflow.log_metric("lgb_val_defer_f1", f1)
+        mlflow.log_metric("lgb_rawrow_accuracy", acc)
+        mlflow.log_metric("lgb_rawrow_defer_f1", f1)
         mlflow.log_param("lgb_decoder_policy", policy)
         mlflow.sklearn.log_model(model, "model", serialization_format="pickle")
         _save_model_artifact("lightgbm", model, scaler, classes, train_arrays.max_trucks)
@@ -495,10 +534,17 @@ def train_lightgbm(
 
         return {
             "lgb_results": {
-                "lgb_val_accuracy": acc,
-                "lgb_val_defer_f1": f1,
+                # Diagnóstico del clasificador crudo, no cifra publicable: la
+                # tabla lee `lgb_operational.model`, igual que las otras cinco filas.
+                "lgb_rawrow_accuracy": acc,
+                "lgb_rawrow_defer_f1": f1,
                 "lgb_operational": operational,
                 "lgb_decoder_policy": policy,
+                # La tabla comparativa rechaza publicar una fila que no declare
+                # su partición. Estas tres fuentes estaban exentas por no traer
+                # la clave, que es medio agujero en la puerta que la vigila.
+                "split_strategy": "time",
+                "seed": seed,
                 "run_id": run_id,
             },
             "lgb_predictions": predictions,
@@ -516,6 +562,7 @@ def train_attention(
     batch_size: int,
     learning_rate: float,
     n_epochs: int,
+    seed: int,
     run_name: str,
 ) -> dict:
     from fleet_loading.pipelines.training.attention_model import train_attention as _train
@@ -531,5 +578,6 @@ def train_attention(
         batch_size,
         learning_rate,
         n_epochs,
+        seed,
         run_name,
     )

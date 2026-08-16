@@ -17,16 +17,37 @@ partición**.
 | `train_attention` | ídem | att_results, att_predictions | Codificador transformer sobre el conjunto de vehículos del episodio, con cabeza por par y cabeza de diferimiento; eje de camiones dinámico |
 | `report_confusion_matrices` | las tres predicciones + xgb/lgb_results | 5 figuras | Paso de puro renderizado: lee predicciones cacheadas y escribe los PNG |
 
-Los nodos de entrenamiento solo emiten **datos** (métricas y predicciones) al
-catálogo; nunca dibujan. Como las figuras son función pura de las predicciones,
-recolorearlas es editar `_confusion_matrix_figure` en `nodes.py` y re-ejecutar
-un solo nodo rápido:
+Los nodos de entrenamiento emiten **datos** al catálogo (métricas y
+predicciones); las matrices de confusión las dibuja el nodo de reporte a partir
+de ellas. Como son función pura de las predicciones, recolorearlas nunca exige
+reentrenar:
 
 ```bash
 uv run --project .. kedro run --nodes report_confusion_matrices
 ```
 
-No hace falta reentrenar.
+Los tres modelos escriben además su curva y su matriz bajo
+`artifacts/fleet_loading/<modelo>/`. No es duplicación: las rutas del catálogo
+viven en `fleet_loading/data/08_reporting/`, que `fleet_loading/.gitignore`
+excluye, así que esas figuras no sobrevivían a un clon —lo mismo que le pasó a
+las curvas, que sólo existían dentro de MLflow y **se perdieron** al reiniciarse
+la base. Ver [métricas](metricas.md#curvas-de-entrenamiento).
+
+## Reproducibilidad
+
+`conf/base/parameters.yml` fija `seed: 42` en los tres modelos, y los tres lo
+aplican donde hace falta:
+
+| Modelo | Qué era aleatorio sin semilla |
+|---|---|
+| XGBoost | `subsample=0.8` y `colsample_bytree=0.8`, que muestrean en cada ronda |
+| LightGBM | ídem |
+| Transformer | inicialización de pesos, dropout y el `shuffle` del `DataLoader` |
+
+Hasta agosto de 2026 ninguno la fijaba, así que **las cifras publicadas no se
+podían volver a obtener** y una diferencia entre dos modelos no se distinguía de
+la varianza entre dos corridas del mismo. La semilla queda registrada como
+parámetro de MLflow y dentro de cada `*_results.json`.
 
 ## La partición es la misma para los seis modelos
 
