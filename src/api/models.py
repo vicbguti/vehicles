@@ -8,10 +8,14 @@ guardado en ``pairwise_schema.json`` y el decoder con capacidad. Nada de esto se
 reimplementa aquí; este módulo sólo orquesta lo existente para un único
 manifiesto.
 
-Los cuatro modelos servidos (XGBoost, LightGBM, el transformer de atención y
-el MLP de Keras) son *pairwise*: el eje de camiones es dinámico, así que **no
-hay límite de camiones ni de capacidad**. La diferencia entre ellos está sólo
-en cómo se cargan los logits:
+Se sirven los seis modelos del repositorio. Cuatro son *pairwise* (XGBoost,
+LightGBM, el transformer de atención y el MLP de Keras): su eje de camiones es
+dinámico, así que **no hay límite de camiones ni de capacidad**. RF y la
+regresión logística son de ancho fijo (flota rellenada a ``max_trucks``), así
+que **sólo sirven flotas de hasta ese tope**; más allá, el API responde un
+error claro en vez de un plan inválido.
+
+La diferencia entre modelos está sólo en cómo se cargan los logits:
 
 * XGBoost y LightGBM: clasificador binario por filas de opción
   (`logits_from_proba`).
@@ -19,10 +23,8 @@ en cómo se cargan los logits:
 * MLP: puntúa el lote completo (`pair_features`, `defer_features`,
   `mask_bias`) y devuelve logits crudos, igual que `scripts/evaluate_mlp.py`.
   Requiere Keras (usa el backend de torch si no hay TensorFlow).
-
-Los dos clásicos del repositorio quedan fuera: RF y regresión logística son de
-ancho fijo (flota rellenada a ``max_trucks``), con lo que no generalizan por
-encima del rango de entrenamiento.
+* RF y logreg: clasificador multiclase de ancho fijo (`FlatArrays` +
+  `predict_proba`), igual que `scripts/train_classical.py`.
 """
 
 from __future__ import annotations
@@ -49,20 +51,27 @@ from src.modeling.metrics import episode_logits  # noqa: E402
 
 ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "fleet_loading"
 
-# El MLP vive en artifacts/mlp/ con otro formato de artefacto; el resto, en
-# artifacts/fleet_loading/<modelo>/ con pairwise_schema.json.
+# El MLP vive en artifacts/mlp/ con otro formato de artefacto; los clásicos
+# (RF, logreg), en artifacts/<modelo>/ con feature_schema.json plano; el resto,
+# en artifacts/fleet_loading/<modelo>/ con pairwise_schema.json.
 ARTIFACT_DIRS = {
     "xgboost": ARTIFACT_ROOT / "xgboost",
     "lightgbm": ARTIFACT_ROOT / "lightgbm",
     "attention": ARTIFACT_ROOT / "attention",
     "mlp": REPO_ROOT / "artifacts" / "mlp",
+    "rf": REPO_ROOT / "artifacts" / "rf",
+    "logreg": REPO_ROOT / "artifacts" / "logreg",
 }
 SCHEMA_FILES = {
     "xgboost": "pairwise_schema.json",
     "lightgbm": "pairwise_schema.json",
     "attention": "pairwise_schema.json",
     "mlp": "feature_schema.json",
+    "rf": "feature_schema.json",
+    "logreg": "feature_schema.json",
 }
+# Los de ancho fijo sólo admiten flotas de hasta `max_trucks` camiones.
+FLAT_MODELS = {"rf", "logreg"}
 
 # Política de decodificación por defecto (objetivo primario: contar vehículos).
 DEFAULT_POLICY = "count"
@@ -95,6 +104,10 @@ class ModelService:
         )
         self.classes: list[str] = schema["classes"]
         self.scaler = BlockScaler.from_dict(schema["blocks"])
+        # Los clásicos son de ancho fijo: su tope es parte del artefacto.
+        self.max_trucks: int | None = (
+            int(schema["max_trucks_padding"]) if model_name in FLAT_MODELS else None
+        )
         self._policy = self._load_policy()
 
         if model_name == "mlp":
@@ -107,6 +120,11 @@ class ModelService:
         elif model_name == "attention":
             self._classifier = None
             self._predict_proba: Callable | None = None
+        elif model_name in FLAT_MODELS:
+            import joblib
+
+            self._classifier = joblib.load(self.artifact_dir / "model.joblib")
+            self._predict_proba: Callable | None = None
         else:
             import joblib
 
@@ -118,6 +136,10 @@ class ModelService:
         if self.model_name == "mlp":
             results = self.artifact_dir / "metrics.json"
             key = "decoder_policy_selected"
+        elif self.model_name in FLAT_MODELS:
+            # La política viaja dentro del propio feature_schema.json plano.
+            results = self.artifact_dir / "feature_schema.json"
+            key = "decoder_policy"
         else:
             stem = {"xgboost": "xgb", "lightgbm": "lgb", "attention": "att"}[
                 self.model_name
@@ -167,6 +189,15 @@ class ModelService:
             logits_from_proba,
             stack_episode_logits,
         )
+
+        if self.model_name in FLAT_MODELS:
+            # Clasificador multiclase: X plano, una fila por vehículo, y la
+            # probabilidad ya viene en el espacio canónico (0 = SIN_CAMION,
+            # 1..max_trucks). Las columnas de relleno se recortan al decodificar.
+            from src.modeling.flat_features import build_flat_arrays
+
+            flat = build_flat_arrays(episodes, self.scaler, self.max_trucks)
+            return np.asarray(self._classifier.predict_proba(flat.X))
 
         if self.model_name == "mlp":
             # El MLP puntúa el lote completo con sus tres entradas y devuelve
@@ -252,8 +283,8 @@ class ModelService:
 
         Devuelve ``(plan, assignment)``:
         * ``plan`` -- lista de camiones en orden canónico con sus vehículos.
-        * ``assignment`` -- índice canónico del camión por vehículo; ``-1`` =
-          diferido (``DEFERRED``).
+        * ``assignment`` -- índice canónico del camión **por vehículo en el
+          orden de entrada**; ``-1`` = diferido (``DEFERRED``).
 
         Los vehículos se devuelven en el orden en que entraron, pero el plan
         mantiene el orden canónico de camiones (capacidad descendente).
@@ -262,6 +293,13 @@ class ModelService:
             raise ValueError("No hay vehículos para distribuir")
         if not fleet:
             raise ValueError("La flota está vacía")
+
+        if self.model_name in FLAT_MODELS and len(fleet) > (self.max_trucks or 0):
+            raise ValueError(
+                f"El modelo {self.model_name!r} es de ancho fijo: soporta hasta "
+                f"{self.max_trucks} camiones y la flota tiene {len(fleet)}. Usa un "
+                "modelo pairwise (xgboost, lightgbm, attention o mlp) para esta flota."
+            )
 
         episodes, arrays = self._episode_from_manifest(vehicles, fleet)
         ep = episodes[0]
@@ -289,16 +327,23 @@ class ModelService:
         sorted_vehicles = sorted(
             enumerate(vehicles), key=lambda iv: iv[1]["identificador"]
         )
+        # `decode_episode` devuelve la asignación en el orden interno de filas
+        # del modelo, que en ambos tipos es uid ascendente. Se reindexa al
+        # orden de entrada para que el plan y el `assignment` devuelto queden
+        # siempre alineados con `vehicles`.
+        per_vehicle = np.empty(len(vehicles), dtype=int)
         for model_pos, (orig_idx, v) in enumerate(sorted_vehicles):
             truck_idx = decoded.assignment[model_pos]
-            entry = {
-                "identificador": v["identificador"],
-                "clase": v["clase"],
-                "cu": v["cu"],
-                "canton": v["canton"],
-            }
+            per_vehicle[orig_idx] = truck_idx
             if truck_idx == DEFERRED:
                 continue
-            trucks[truck_idx]["vehicles"].append(entry)
+            trucks[truck_idx]["vehicles"].append(
+                {
+                    "identificador": v["identificador"],
+                    "clase": v["clase"],
+                    "cu": v["cu"],
+                    "canton": v["canton"],
+                }
+            )
 
-        return trucks, decoded.assignment.tolist()
+        return trucks, per_vehicle.tolist()

@@ -38,8 +38,11 @@ anterior y además activa los hooks de pre-commit.
 
 ## Servicio de distribución (API)
 
-Los cuatro modelos pairwise (XGBoost, LightGBM, el transformer y el MLP de
-Keras) se sirven como API FastAPI en `src/api/`:
+Los seis modelos del repositorio se sirven como API FastAPI en `src/api/`:
+los cuatro *pairwise* (XGBoost, LightGBM, el transformer y el MLP de Keras) sin
+límite de camiones ni de capacidad, y los dos de ancho fijo (Random Forest y
+regresión logística) con el tope `max_trucks` de su artefacto aplicado
+explícitamente por el servicio:
 
 ```bash
 FLEET_LOADING_MODEL=mlp fleet_loading/.venv/bin/python \
@@ -47,9 +50,10 @@ FLEET_LOADING_MODEL=mlp fleet_loading/.venv/bin/python \
 ```
 
 `FLEET_LOADING_MODEL` elige el modelo al arrancar (`xgboost` | `lightgbm` |
-`attention` | `mlp`; por defecto `xgboost`) y `GET /api/health` confirma cuál
-quedó activo. El MLP requiere Keras (usa el backend de torch si no hay
-TensorFlow). Endpoints: `POST /api/manifest` (valida el CSV y la flota) y
+`attention` | `mlp` | `rf` | `logreg`; por defecto `xgboost`) y
+`GET /api/health` confirma cuál quedó activo. El MLP requiere Keras (usa el
+backend de torch si no hay TensorFlow). Endpoints: `POST /api/manifest`
+(valida el CSV y la flota) y
 `POST /api/distribute` (genera el plan). Detalle en
 [`docs/api.md`](./docs/api.md).
 

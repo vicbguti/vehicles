@@ -47,10 +47,12 @@ el proyecto. Detalle en [pipeline Kedro](pipeline_kedro.md).
 
 ## `src/api/` — el servicio de distribución
 
-FastAPI que sirve los cuatro modelos *pairwise* sin límite de camiones ni de
-capacidad: valida el manifiesto con los motivos del caso de uso y genera el
-plan con `decode_episode`, reutilizando `src.modeling`. El modelo en uso se
-elige al arrancar con `FLEET_LOADING_MODEL`. Detalle en
+FastAPI que sirve los seis modelos: los cuatro *pairwise* (XGBoost, LightGBM,
+attention y el MLP) sin límite de camiones ni de capacidad, y los de ancho fijo
+(Random Forest y regresión logística) con el tope `max_trucks` de su artefacto
+aplicado explícitamente. Valida el manifiesto con los motivos del caso de uso y
+genera el plan con `decode_episode`, reutilizando `src.modeling`. El modelo en
+uso se elige al arrancar con `FLEET_LOADING_MODEL`. Detalle en
 [servicio de distribución (API)](api.md).
 
 ## `scripts/` — entradas de línea de comandos
