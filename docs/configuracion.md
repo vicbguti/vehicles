@@ -26,8 +26,8 @@ pruebas que usaban `Fraction` directamente no la ejercitaban.
 
 ## `config/mlp.yaml` — hiper-parámetros del MLP
 
-Arquitectura, optimización, partición y política del decodificador. Cada valor
-lleva escrita su justificación; el detalle está en
+Arquitectura, optimización y partición. Cada valor lleva escrita su
+justificación; el detalle está en
 [arquitectura del MLP](modelo/arquitectura_mlp.md).
 
 La sección `data` fija la **partición temporal** (entrenamiento 2018-2024,
@@ -35,9 +35,18 @@ validación 2025, prueba 2026), que hoy comparten los seis modelos a través de
 `src/modeling/protocol.py`. Ver
 [protocolo de partición](decisiones/04_protocolo_de_particion.md).
 
-`decoder.policy: count` ordena por CU ascendente, alineado con el objetivo
-lexicográfico del maestro (primero cuántos vehículos, después cuánta capacidad).
-Se elige por validación entre `model`, `count` y `respect_defer`.
+!!! note "La política del decodificador no se configura"
+    `scripts/evaluate_mlp.py` barre las tres políticas —`model`, `count` y
+    `respect_defer`— sobre **validación** y se queda con la de menor brecha de
+    conteo. La elegida queda en `artifacts/mlp/metrics.json` como
+    `decoder_policy_selected`, con el barrido completo al lado en
+    `decoder_policy_scan_on_val`.
+
+    Este archivo declaraba un `decoder.policy: count` que **nadie leía** —de
+    `config/mlp.yaml` sólo se carga el bloque `data:`— y que además contradecía
+    lo reportado, porque el barrido elige `model`. Se quitó la clave en vez de
+    corregirle el valor: una clave muerta con el valor correcto se vuelve a
+    desincronizar en el siguiente barrido y nadie se entera.
 
 ## `config/config.yaml` — perfilado y reportes
 

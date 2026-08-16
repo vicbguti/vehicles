@@ -44,8 +44,15 @@ data:
   val_years: [2025]
   test_years: [2026]
 
-decoder:
-  # Política de orden del decoder. "count" ordena por CU ascendente, alineado
-  # con el objetivo lexicográfico del maestro (primero conteo, luego CU).
-  # Se elige por validación entre model / count / respect_defer.
-  policy: count
+# La política del decoder NO se configura aquí, y por eso este archivo ya no la
+# declara. `scripts/evaluate_mlp.py` barre las tres --model / count /
+# respect_defer-- sobre validación y se queda con la de menor brecha de conteo;
+# la elegida queda escrita en `artifacts/mlp/metrics.json` como
+# `decoder_policy_selected`, junto al barrido completo en
+# `decoder_policy_scan_on_val`.
+#
+# Hubo aquí un `decoder.policy: count` que **nadie leía** --de este archivo sólo
+# se carga el bloque `data:`-- y que además contradecía lo publicado: el barrido
+# elige `model`. Poner el valor correcto en una clave muerta habría dejado el
+# mismo problema para la próxima corrida que cambiara de política, así que se
+# quita la clave y se apunta al artefacto, que es donde la cifra tiene origen.
