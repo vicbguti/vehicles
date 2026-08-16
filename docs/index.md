@@ -150,5 +150,6 @@ Con [`just`](https://github.com/casey/just) instalado, `just setup` hace el paso
 | ver el árbol del código | [estructura](estructura.md) |
 | saber qué hay en `data/` | [datos](datos.md) |
 | las fórmulas de las métricas | [métricas operativas](metricas.md) |
+| servir el planificador como API | [servicio de distribución](api.md) |
 | por qué el repositorio está así | [decisiones de ingeniería](decisiones/01_hallazgos_transversales.md) |
 | la trazabilidad al reporte IEEE | [entrega](entrega/index.md) |

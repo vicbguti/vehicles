@@ -36,6 +36,22 @@ head -c 40 data/clean/SRI_Vehiculos_Nuevos_2025.csv   # no debe decir "version h
 Con [`just`](https://github.com/casey/just) instalado, `just setup` hace todo lo
 anterior y además activa los hooks de pre-commit.
 
+## Servicio de distribución (API)
+
+Los tres modelos pairwise (XGBoost, LightGBM y el transformer) se sirven como
+API FastAPI en `src/api/`:
+
+```bash
+FLEET_LOADING_MODEL=attention fleet_loading/.venv/bin/python \
+    -m uvicorn src.api.main:app --port 8000
+```
+
+`FLEET_LOADING_MODEL` elige el modelo al arrancar (`xgboost` | `lightgbm` |
+`attention`; por defecto `xgboost`) y `GET /api/health` confirma cuál quedó
+activo. Endpoints: `POST /api/manifest` (valida el CSV y la flota) y
+`POST /api/distribute` (genera el plan). Detalle en
+[`docs/api.md`](./docs/api.md).
+
 ## Uso
 
 ```bash

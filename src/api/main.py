@@ -13,6 +13,10 @@ Ejecutar desde la raíz del repositorio::
 
     fleet_loading/.venv/bin/python -m uvicorn src.api.main:app --port 8000
 
+El modelo en uso se elige al arrancar con la variable de entorno
+``FLEET_LOADING_MODEL`` (``xgboost`` | ``lightgbm`` | ``attention``); por
+defecto, ``xgboost``. Se confirma con ``GET /api/health``. Ver ``docs/api.md``.
+
 El CORS se abre a cualquier origen en desarrollo (el frontend de Vite corre en
 otro puerto). En producción se puede restringir vía ``ALLOWED_ORIGINS``.
 """

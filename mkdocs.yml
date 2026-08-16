@@ -28,6 +28,7 @@ nav:
   - Inicio: index.md
   - El sistema:
     - "Estructura del código": estructura.md
+    - "Servicio de distribución (API)": api.md
     - "Datos": datos.md
     - "Configuración": configuracion.md
     - "Git LFS (obligatorio)": git_lfs.md
