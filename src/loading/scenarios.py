@@ -8,7 +8,12 @@ instances for the imitation-learning "student" model:
         -> drop groups with N < FLOOR (=5)          <- see conversation: below this,
                                                          the current fleet policy makes
                                                          a binding decision ~impossible
-        -> stratified subsample to <= MAX_N (=20)    <- labeler's practical budget
+        -> stratified subsample to <= max_n (MAX_N=20 by default)
+                                                     <- labeler's practical budget.
+                                                        Raised only for the
+                                                        manifest-size extrapolation
+                                                        sets; see
+                                                        scripts/build_extrapolation_set.py
         -> synthetic truck fleet (n_trucks, capacities)
         -> labeler.assign_vehicles()                 <- exact optimal assignment
     -> one row per episode  (data/episodes/episodes.parquet)
@@ -120,18 +125,31 @@ class ScenarioSummary:
 
 
 def build_and_label_episode(
-    iso_year: int, iso_week: int, canton, group: pd.DataFrame, time_budget_s: float = 5.0
+    iso_year: int,
+    iso_week: int,
+    canton,
+    group: pd.DataFrame,
+    time_budget_s: float = 5.0,
+    max_n: int = MAX_N,
 ) -> tuple[dict, list[dict]]:
     """Build one episode (subsample + synthetic fleet) and label it.
 
     Returns (episode_record, vehicle_records) -- see build_scenarios.py for
     how these get assembled into the two output tables.
+
+    `max_n`: the per-episode vehicle cap. The default reproduces the training
+    set exactly. It is a parameter, and not just the module constant, so the
+    manifest-size extrapolation sets can lift the cap on the TEST set without
+    touching what the model was trained on -- the cap is the only variable that
+    changes there. Raising it costs labeling time superlinearly: the exact
+    teacher stays within its 5 s budget up to ~40 vehicles and starts timing out
+    around 50.
     """
     n_original = len(group)
     seed = episode_seed(iso_year, iso_week, canton)
     rng = random.Random(seed)  # one RNG stream per episode, consumed in order below
 
-    sampled, n_excluded_subsample = stratified_subsample(group, MAX_N, rng)
+    sampled, n_excluded_subsample = stratified_subsample(group, max_n, rng)
     fleet = generate_fleet(rng)
     labeler_seed = rng.randrange(2**31)  # fresh draw, passed to assign_vehicles' own RNG
 
@@ -178,12 +196,16 @@ def build_and_label_episode(
 
 
 def build_all_episodes(
-    df: pd.DataFrame, limit: int | None = None, time_budget_s: float = 5.0
+    df: pd.DataFrame,
+    limit: int | None = None,
+    time_budget_s: float = 5.0,
+    max_n: int = MAX_N,
 ) -> tuple[pd.DataFrame, pd.DataFrame, ScenarioSummary]:
     """Group the full feature dataset into episodes and label every one.
 
     `limit`: stop after this many episodes -- for quick local testing, since
     the full run is ~35k episodes (~30 min, see 06_feasibility.md).
+    `max_n`: forwarded to `build_and_label_episode`; see its docstring.
     """
     groups = df.groupby(["iso_year", "iso_week", "canton"], sort=True)
     n_groups_total, n_below_floor = 0, 0
@@ -194,7 +216,7 @@ def build_all_episodes(
         if len(group) < FLOOR_N:
             n_below_floor += 1
             continue
-        ep, vehs = build_and_label_episode(iso_year, iso_week, canton, group, time_budget_s)
+        ep, vehs = build_and_label_episode(iso_year, iso_week, canton, group, time_budget_s, max_n)
         episode_records.append(ep)
         vehicle_records.extend(vehs)
         if limit and len(episode_records) >= limit:
