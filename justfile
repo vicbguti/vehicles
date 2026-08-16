@@ -87,6 +87,17 @@ train-rf trials="50":
 train-logreg trials="50":
     uv run python scripts/train_classical.py --model logreg --split time --n-trials {{ trials }}
 
+# Reajusta los clásicos con los hiperparámetros ya publicados, sin repetir la
+# búsqueda: la del RF costó 100 min y 50 intentos. Es lo que hay que correr para
+# regenerar artefactos o curvas sin cambiar las cifras publicadas.
+refit-rf:
+    uv run python scripts/train_classical.py --model rf --split time \
+        --refit-from artifacts/rf/training_report.json
+
+refit-logreg:
+    uv run python scripts/train_classical.py --model logreg --split time \
+        --refit-from artifacts/logreg/training_report.json
+
 # Los tres modelos del pipeline Kedro (XGBoost, LightGBM, transformer).
 #
 # El `--project ..` no es adorno: sin él, uv toma fleet_loading/ como raíz de

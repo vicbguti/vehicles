@@ -67,12 +67,64 @@ Dos detalles de la búsqueda de la regresión logística:
 ```bash
 just train-rf          # o: uv run python scripts/train_classical.py --model rf
 just train-logreg
+
+just refit-rf          # reajusta con los hiperparámetros ya publicados
+just refit-logreg      # sin repetir la búsqueda
 ```
+
+`--refit-from` toma los `best_params` de un `training_report.json` anterior y
+salta Optuna. Existe porque la búsqueda del Random Forest costó **100 minutos y
+50 intentos**, y volver a pagarla para regenerar un artefacto o una figura no
+sólo es caro: cambiaría los hiperparámetros publicados sin motivo.
 
 Cada uno deja en `artifacts/<modelo>/`: `model.joblib`, `feature_schema.json`
 —con el `BlockScaler` y los nombres de columna—, `label_mapping.json` y
 `training_report.json`, que es de donde
-[la tabla comparativa](../index.md) toma las cifras.
+[la tabla comparativa](../index.md) toma las cifras. Además
+`training_history.csv`, `learning_curves.png` y `confusion_matrix.png` sobre
+validación, en el formato común a los seis modelos.
+
+### La curva de convergencia de un modelo sin épocas
+
+Ninguno de los dos tiene «época», y hasta agosto de 2026 eran los dos únicos del
+proyecto sin curva de entrenamiento. Sí tienen un eje de convergencia propio, que
+es el análogo exacto de la ronda de boosting de los GBT:
+
+| Modelo | `step_unit` | Cómo |
+|---|---|---|
+| Random Forest | `n_trees` | `warm_start`: los árboles se acumulan en el mismo bosque |
+| Regresión logística | `lbfgs_iter` | un ajuste **independiente** por presupuesto creciente |
+
+En los dos casos el último punto de la curva **es** el modelo publicado, así que
+la figura no puede describir a otro. Pero la forma de recorrer el eje no es la
+misma, y confundirlas cuesta calidad:
+
+Para el bosque, `warm_start` es exacto —crecerlo en diez tramos da un objeto bit
+a bit igual al de un solo ajuste, fijado por prueba— y la curva sale gratis.
+
+Para la logística **no sirve**: lbfgs pierde su aproximación del Hessiano en cada
+reanudación, así que diez tramos de 200 iteraciones rinden mucho menos que 2.000
+seguidas. Medido sobre los datos reales, los diez tramos terminaban *sin
+converger* —cada uno agotaba su límite— y daban un modelo peor:
+
+| | ajuste único | reanudando |
+|---|---:|---:|
+| log-loss (validación) | **0,3982** | 0,3990 |
+| F1 macro (validación) | **0,8137** | 0,8120 |
+| norma media de los coeficientes | 3,34 | 2,34 |
+
+Publicar eso habría sido degradar el modelo a cambio de poder dibujar una figura.
+Por eso cada punto es un ajuste independiente —«¿a dónde llega lbfgs con 200
+iteraciones? ¿y con 400?»—, que además es lo que la curva dice que muestra. Como
+lbfgs converge en ~776 iteraciones, los presupuestos mayores repiten ese mismo
+modelo y el último es exactamente el de un `fit()` a secas.
+
+Lo que se paga son las evaluaciones intermedias, sobre una muestra fija de 50.000
+filas de entrenamiento y la validación completa.
+
+La unidad del eje viaja en el propio CSV, así que la gráfica se rotula sola y no
+puede acabar diciendo «época». Ver
+[curvas de entrenamiento](../metricas.md#curvas-de-entrenamiento).
 
 `training_report.json` guarda `split_strategy`, y
 `scripts/report_model_table.py` **rechaza publicar** una fila que no se haya

@@ -50,6 +50,13 @@ from src.modeling.dataset import (  # noqa: E402
     summarize_splits,
 )
 from src.modeling.features import BlockScaler, build_all_episodes  # noqa: E402
+from src.modeling.figures import (  # noqa: E402
+    PRESENTACION,
+    etiquetas_canonicas,
+    plot_confusion_matrix,
+    plot_curves,
+    write_history,
+)
 from src.modeling.flat_features import (  # noqa: E402
     FlatArrays,
     build_flat_arrays,
@@ -132,6 +139,24 @@ def finalize_params(model_name: str, best_params: dict) -> dict:
     return {**params, **fixed_extras(model_name)}
 
 
+# Un `RandomForestClassifier` no expone su tamaño en bytes sin serializarlo, así
+# que se decide por el número de nodos, que sí es barato de contar y es lo que
+# manda: los 1,4 GB del bosque publicado son ~500 árboles de profundidad 26.
+MAX_NODOS_MLFLOW = 2_000_000
+
+
+def _cabe_en_mlflow(modelo, model_name: str) -> bool:
+    """¿Merece la pena registrar el binario en MLflow, o es demasiado grande?
+
+    Se mide en vez de decidirlo por nombre de modelo: un RF de 50 árboles poco
+    profundos sí cabe, y una regla `if model_name == "rf"` lo excluiría igual.
+    """
+    if model_name != "rf":
+        return True
+    nodos = sum(int(e.tree_.node_count) for e in modelo.estimators_)
+    return nodos <= MAX_NODOS_MLFLOW
+
+
 def build_model(model_name: str, params: dict):
     if model_name == "rf":
         from sklearn.ensemble import RandomForestClassifier
@@ -140,6 +165,121 @@ def build_model(model_name: str, params: dict):
     from sklearn.linear_model import LogisticRegression
 
     return LogisticRegression(**params)
+
+
+# ---------------------------------------------------------- curva de convergencia
+#
+# Ni el Random Forest ni la regresión logística tienen «época», así que eran los
+# dos únicos modelos del proyecto sin curva de entrenamiento. Sí tienen un eje de
+# convergencia propio --árboles e iteraciones de lbfgs--, análogo a la ronda de
+# boosting de los GBT, y cada uno declara el suyo en el CSV.
+#
+# La forma de recorrerlo NO es la misma para los dos, y confundirlas cuesta
+# calidad del modelo publicado:
+#
+#   * **Random Forest**: `warm_start` es exacto. Los árboles se acumulan en el
+#     mismo bosque, así que crecerlo en diez tramos da un objeto bit a bit igual
+#     al de un solo ajuste (fijado en tests/test_train_classical.py) y la curva
+#     sale gratis.
+#
+#   * **Regresión logística**: `warm_start` NO sirve. lbfgs pierde su
+#     aproximación del Hessiano en cada reanudación, así que diez tramos de 200
+#     iteraciones rinden mucho menos que 2.000 seguidas: medido sobre los datos
+#     reales, los diez tramos terminan SIN converger --cada uno agota su límite--
+#     y dan un modelo peor (log-loss de validación 0,3990 frente a 0,3982,
+#     macro-F1 0,8120 frente a 0,8137, coeficientes de norma media 2,34 frente a
+#     3,34: infra-ajustado). Publicar eso para poder dibujar una curva sería
+#     degradar el modelo a cambio de una figura.
+#
+#     Así que cada punto es un ajuste **independiente** con presupuesto creciente
+#     --«¿a dónde llega lbfgs con 200 iteraciones? ¿y con 400?»--, que es además
+#     lo que la curva dice que muestra. El último punto usa el presupuesto
+#     completo, o sea que ES el modelo de un ajuste único, y como lbfgs converge
+#     en ~776 iteraciones los presupuestos mayores repiten ese mismo modelo.
+TRAMOS = 10
+
+# Las evaluaciones intermedias se hacen sobre una muestra fija de entrenamiento.
+# `predict_proba` de 500 árboles sobre las 444.051 filas, diez veces, domina el
+# coste; 50.000 filas dan la misma forma de curva. La validación va entera: es la
+# partición que se publica y no admite muestreo.
+MUESTRA_CURVA = 50_000
+
+
+def _eje_y_tramos(model_name: str, params: dict) -> tuple[str, str, list[int]]:
+    """`(step_unit, hiperparámetro que crece, presupuestos crecientes)`.
+
+    Los valores son acumulados --50, 100, ... 500 árboles-- porque son también lo
+    que va a la columna `step` del CSV: el eje de la gráfica tiene que estar en
+    árboles o en iteraciones, no en «número de tramo», o mentiría por un factor
+    de 50. El último es siempre el presupuesto completo, sin repetirlo.
+    """
+    clave = "n_estimators" if model_name == "rf" else "max_iter"
+    unidad = "n_trees" if model_name == "rf" else "lbfgs_iter"
+    total = int(params[clave])
+    paso = max(1, total // TRAMOS)
+    acumulados = list(range(paso, total + 1, paso))[:TRAMOS]
+    if acumulados[-1] != total:
+        acumulados.append(total)
+    return unidad, clave, acumulados
+
+
+def ajustar_con_curva(model_name: str, params: dict, train, val, seed: int):
+    """`(modelo final, filas de la curva, step_unit, presupuestos)`.
+
+    El modelo devuelto es siempre el del presupuesto completo, así que la curva
+    termina exactamente en el modelo que se publica: no hay un segundo ajuste por
+    detrás que pueda divergir de lo que muestra la figura.
+    """
+    import warnings
+
+    from sklearn.exceptions import ConvergenceWarning
+    from sklearn.metrics import f1_score, log_loss
+
+    step_unit, clave, tramos = _eje_y_tramos(model_name, params)
+    acumula = model_name == "rf"  # ver el comentario de arriba
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(train.target), size=min(MUESTRA_CURVA, len(train.target)), replace=False)
+    X_tr, y_tr = train.X[idx], train.target[idx]
+
+    modelo = build_model(model_name, {**params, clave: tramos[0], "warm_start": acumula})
+    filas = []
+    for i, valor in enumerate(tramos):
+        if acumula:
+            modelo.set_params(**{clave: valor})
+        else:
+            # Ajuste nuevo por presupuesto, no reanudación.
+            modelo = build_model(model_name, {**params, clave: valor})
+        with warnings.catch_warnings():
+            # sklearn desaconseja `class_weight="balanced"` con `warm_start`
+            # «si los datos ajustados difieren del conjunto completo». Aquí nunca
+            # difieren --siempre se ajusta el train entero--, así que los pesos
+            # salen idénticos en cada tramo y el bosque resultante es bit a bit
+            # el de un ajuste único. Comprobado en tests/test_train_classical.py.
+            warnings.filterwarnings("ignore", message=".*class_weight presets.*")
+            # Los presupuestos intermedios no convergen a propósito: ése es el
+            # punto de la curva. Sólo interesa la advertencia del último, que si
+            # aparece significa que el modelo publicado se quedó corto.
+            if i < len(tramos) - 1:
+                warnings.simplefilter("ignore", ConvergenceWarning)
+            modelo.fit(train.X, train.target)
+
+        fila = {}
+        for nombre, X, y in (("", X_tr, y_tr), ("val_", val.X, val.target)):
+            proba = modelo.predict_proba(X)
+            fila[f"{nombre}loss"] = float(log_loss(y, proba, labels=modelo.classes_))
+            fila[f"{nombre}macro_f1"] = float(
+                f1_score(y, modelo.classes_[proba.argmax(axis=1)], average="macro", zero_division=0)
+            )
+        filas.append(fila)
+        print(
+            f"  {step_unit}={valor:<5} loss={fila['loss']:.4f} val_loss={fila['val_loss']:.4f} "
+            f"macro_f1={fila['macro_f1']:.4f} val={fila['val_macro_f1']:.4f}"
+        )
+
+    # `warm_start` era un medio para dibujar la curva, no una propiedad del
+    # modelo publicado: se deja como lo dejaría un ajuste normal.
+    modelo.set_params(warm_start=False)
+    return modelo, filas, step_unit, tramos
 
 
 # ------------------------------------------------------------- métricas de dominio
@@ -188,6 +328,16 @@ def main() -> None:
     parser.add_argument("--out-dir", type=Path, default=None)
     parser.add_argument("--split", choices=("time", "hash"), default="time")
     parser.add_argument("--n-trials", type=int, default=50)
+    parser.add_argument(
+        "--refit-from",
+        type=Path,
+        default=None,
+        metavar="training_report.json",
+        help="Reajusta con los `best_params` de un informe anterior y salta Optuna. "
+        "La búsqueda del RF costó 100 min y 50 intentos; volver a pagarla sólo para "
+        "regenerar curvas o artefactos no tiene sentido, y además cambiaría los "
+        "hiperparámetros publicados. Por omisión (sin la bandera) se busca de cero.",
+    )
     parser.add_argument(
         "--n-jobs",
         type=int,
@@ -265,26 +415,47 @@ def main() -> None:
         return val_macro_f1
 
     t0 = time.perf_counter()
-    with mlflow.start_run(run_name=f"{args.model}_search") as parent_run:
+    run_name = f"{args.model}_{'refit' if args.refit_from else 'search'}"
+    with mlflow.start_run(run_name=run_name) as parent_run:
         mlflow.log_params(
             {
                 "model": args.model,
-                "n_trials": args.n_trials,
+                "n_trials": 0 if args.refit_from else args.n_trials,
                 "split_strategy": args.split,
                 "max_trucks": max_trucks,
                 "n_features": len(feat_names),
                 "seed": args.seed,
+                "refit_from": str(args.refit_from) if args.refit_from else "",
             }
         )
-        study = optuna.create_study(
-            direction="maximize",
-            sampler=optuna.samplers.TPESampler(seed=args.seed),
-        )
-        study.optimize(objective, n_trials=args.n_trials, n_jobs=args.n_jobs)
-        search_seconds = time.perf_counter() - t0
+        if args.refit_from:
+            informe = json.loads(args.refit_from.read_text(encoding="utf-8"))
+            if "best_params" not in informe:
+                raise SystemExit(f"{args.refit_from} no trae `best_params`; no hay qué reajustar.")
+            study = None
+            best_trial_params = informe["best_params"]
+            n_trials_previos = informe.get("n_trials")
+            search_seconds = 0.0
+            print(f"Reajuste desde {args.refit_from} (búsqueda saltada): {best_trial_params}")
+        else:
+            study = optuna.create_study(
+                direction="maximize",
+                sampler=optuna.samplers.TPESampler(seed=args.seed),
+            )
+            study.optimize(objective, n_trials=args.n_trials, n_jobs=args.n_jobs)
+            search_seconds = time.perf_counter() - t0
+            best_trial_params = study.best_params
+            n_trials_previos = args.n_trials
 
-        best_params = finalize_params(args.model, study.best_params)
-        best_model = build_model(args.model, best_params).fit(train.X, train.target)
+        best_params = finalize_params(args.model, best_trial_params)
+        # El ajuste final se hace por tramos para emitir la curva de convergencia.
+        # El modelo que sale es el mismo que daría un `.fit()` único --el último
+        # tramo tiene todos los árboles o todas las iteraciones--, así que la
+        # curva describe exactamente al modelo que se publica.
+        print(f"Ajuste final por tramos ({args.model}):")
+        best_model, curva, step_unit, pasos = ajustar_con_curva(
+            args.model, best_params, train, val, args.seed
+        )
 
         # `predict_proba` sólo devuelve columnas para las clases vistas en
         # `train.target` (`model.classes_`). Si alguna vez faltara una -- p.ej.
@@ -309,7 +480,7 @@ def main() -> None:
         }
         greedy_val = aggregate(evaluate_greedy(episodes["val"], val, n_classes), n_labels)
 
-        mlflow.log_params({"best_" + k: v for k, v in study.best_params.items()})
+        mlflow.log_params({"best_" + k: v for k, v in best_trial_params.items()})
         mlflow.log_param("decoder_policy", policy)
         mlflow.log_metrics(
             {
@@ -319,7 +490,26 @@ def main() -> None:
                 if isinstance(value, (int, float))
             }
         )
-        mlflow.sklearn.log_model(best_model, "model")
+        # El binario del modelo NO siempre va a MLflow. El bosque del RF ocupa
+        # 1,4 GB --500 árboles de profundidad 26 sobre 444.051 filas-- y
+        # serializarlo agotaba la memoria de la máquina: el reajuste del 16 de
+        # agosto murió exactamente aquí, y `mlruns/` ya llevaba 1,4 GB de una
+        # corrida anterior.
+        #
+        # Es la misma decisión que el repositorio ya tomó para git (ver
+        # `.gitignore`: `artifacts/rf/model.joblib` está excluido por tamaño) y
+        # por el mismo motivo: no se pierde nada reproducible, porque
+        # `training_report.json` guarda `best_params`, la semilla es fija y
+        # `--refit-from` reconstruye el modelo. La regresión logística pesa 1,4 kB
+        # y se registra con normalidad.
+        if _cabe_en_mlflow(best_model, args.model):
+            mlflow.sklearn.log_model(best_model, name="model")
+        else:
+            mlflow.set_tag("model_artifact", "omitido por tamaño; ver artifacts/<modelo>/")
+            print(
+                f"MLflow: no se registra el binario de {args.model} (demasiado grande). "
+                "Se reconstruye con --refit-from."
+            )
         best_run_id = parent_run.info.run_id
 
     # --- Artefactos ------------------------------------------------------------
@@ -328,6 +518,34 @@ def main() -> None:
     import joblib
 
     joblib.dump(best_model, out_dir / "model.joblib")
+
+    # Curva de convergencia y matriz de confusión, en el formato común a los seis
+    # modelos (`src/modeling/figures.py`). Estos dos eran los únicos que no
+    # producían ninguna de las dos figuras del póster.
+    presentacion = PRESENTACION[args.model]
+    write_history(out_dir / "training_history.csv", curva, step_unit, steps=pasos)
+    plot_curves(
+        curva,
+        step_unit,
+        out_dir / "learning_curves.png",
+        presentacion.titulo,
+        steps=pasos,
+        metrica=presentacion.metrica,
+        nombre_metrica=presentacion.nombre_metrica,
+        nota=(
+            f"La pérdida de entrenamiento se evalúa sobre una muestra fija de "
+            f"{MUESTRA_CURVA:,} filas; la de validación, sobre las "
+            f"{len(val.target):,} completas."
+        ),
+    )
+    # Sobre VALIDACIÓN, que es la partición de la tabla comparativa y la única
+    # que se puede poner al lado de las figuras de los otros cuatro modelos.
+    plot_confusion_matrix(
+        domain["val"]["confusion_matrix"],
+        etiquetas_canonicas(n_labels),
+        presentacion.titulo_matriz,
+        out_dir / "confusion_matrix.png",
+    )
 
     (out_dir / "feature_schema.json").write_text(
         json.dumps(
@@ -379,9 +597,16 @@ def main() -> None:
                 "episodes_dropped_non_optimal": n_non_optimal,
                 "splits": [s.as_dict() for s in summaries],
                 "canonical_label_counts": label_counts,
-                "n_trials": args.n_trials,
-                "best_params": study.best_params,
-                "best_val_macro_f1": study.best_value,
+                "n_trials": n_trials_previos,
+                "best_params": best_trial_params,
+                # Con --refit-from no hay búsqueda nueva, así que no hay
+                # `best_value` que reportar: se arrastra el del informe original
+                # para que el JSON siga diciendo de dónde salieron los params.
+                "best_val_macro_f1": (
+                    study.best_value if study else informe.get("best_val_macro_f1")
+                ),
+                "refit_from": str(args.refit_from) if args.refit_from else None,
+                "curve_step_unit": step_unit,
                 "decoder_policy": policy,
                 "domain_metrics": domain,
                 "greedy_baseline_val": greedy_val,
@@ -397,8 +622,11 @@ def main() -> None:
         encoding="utf-8",
     )
 
-    print(f"\nBúsqueda: {args.n_trials} intentos en {search_seconds:.1f}s")
-    print(f"Mejores hiperparámetros: {study.best_params}")
+    if study:
+        print(f"\nBúsqueda: {args.n_trials} intentos en {search_seconds:.1f}s")
+    else:
+        print(f"\nSin búsqueda: hiperparámetros reajustados desde {args.refit_from}")
+    print(f"Mejores hiperparámetros: {best_trial_params}")
     print(f"Política de decodificador elegida: {policy}")
     print(
         f"Test  -- capacity_violation_rate={domain['test']['capacity_violation_rate']:.4f}  "
