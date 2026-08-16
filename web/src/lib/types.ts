@@ -1,17 +1,21 @@
 export type VehicleStatus = "accepted" | "rejected"
 
 export interface Vehicle {
-  id: string
+  identificador: string
   clase: string
-  storage: string
+  cu: number
   canton: string
   status: VehicleStatus
   reason?: string
 }
 
-export interface DistributionGroup {
+export interface Truck {
   id: string
-  name: string
-  capacity?: number
+  capacity: number
   vehicles: Vehicle[]
+}
+
+export interface DistributionPlan {
+  trucks: Truck[]
+  sinCamion: Vehicle[]
 }

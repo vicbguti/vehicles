@@ -9,6 +9,10 @@ import {
 import type { Vehicle } from "@/lib/types"
 import { VehicleStatusBadge } from "./VehicleStatusBadge"
 
+function formatCu(cu: number): string {
+  return cu > 0 ? cu.toFixed(1) : "-"
+}
+
 interface VehicleTableProps {
   vehicles: Vehicle[]
 }
@@ -34,12 +38,12 @@ export function VehicleTable({ vehicles }: VehicleTableProps) {
       <TableBody>
         {vehicles.map((vehicle, index) => (
           <TableRow
-            key={vehicle.id}
+            key={vehicle.identificador}
             className={`border-b-0 ${index % 2 === 1 ? "bg-muted/30 hover:bg-muted/40" : "hover:bg-muted/40"}`}
           >
-            <TableCell className="pl-5 py-3 font-medium">{vehicle.id}</TableCell>
+            <TableCell className="pl-5 py-3 font-medium">{vehicle.identificador}</TableCell>
             <TableCell className="py-3">{vehicle.clase}</TableCell>
-            <TableCell className="py-3">{vehicle.storage}</TableCell>
+            <TableCell className="py-3">{formatCu(vehicle.cu)}</TableCell>
             <TableCell className="py-3">{vehicle.canton}</TableCell>
             <TableCell className="pl-5 pr-5 py-3">
               <VehicleStatusBadge vehicle={vehicle} />

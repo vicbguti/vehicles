@@ -8,6 +8,10 @@ import {
 } from "@/components/ui/table"
 import type { Vehicle } from "@/lib/types"
 
+function formatCu(cu: number): string {
+  return cu > 0 ? cu.toFixed(1) : "-"
+}
+
 interface DistributionTableProps {
   vehicles: Vehicle[]
 }
@@ -32,12 +36,12 @@ export function DistributionTable({ vehicles }: DistributionTableProps) {
       <TableBody>
         {vehicles.map((vehicle, index) => (
           <TableRow
-            key={vehicle.id}
+            key={vehicle.identificador}
             className={`border-b-0 ${index % 2 === 1 ? "bg-muted/20 hover:bg-muted/40" : "hover:bg-muted/40"}`}
           >
-            <TableCell className="py-2.5 pl-4">{vehicle.id}</TableCell>
+            <TableCell className="py-2.5 pl-4">{vehicle.identificador}</TableCell>
             <TableCell className="py-2.5">{vehicle.clase}</TableCell>
-            <TableCell className="py-2.5">{vehicle.storage}</TableCell>
+            <TableCell className="py-2.5">{formatCu(vehicle.cu)}</TableCell>
             <TableCell className="py-2.5 pl-4 pr-4">{vehicle.canton}</TableCell>
           </TableRow>
         ))}

@@ -14,18 +14,22 @@ import { SelectedFile } from "./SelectedFile"
 interface UploadManifestoDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onContinue: () => void
+  onContinue: (file: File) => void
+  loading?: boolean
+  error?: string | null
 }
 
 export function UploadManifestoDialog({
   open,
   onOpenChange,
   onContinue,
+  loading = false,
+  error = null,
 }: UploadManifestoDialogProps) {
   const [file, setFile] = useState<File | null>(null)
 
   const handleOpenChange = (next: boolean) => {
-    if (!next) setFile(null)
+    if (!next && !loading) setFile(null)
     onOpenChange(next)
   }
 
@@ -49,18 +53,21 @@ export function UploadManifestoDialog({
 
         {file && <SelectedFile file={file} onRemove={() => setFile(null)} />}
 
+        {error && (
+          <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+
         <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={loading}>
             Cancelar
           </Button>
           <Button
-            disabled={!file}
-            onClick={() => {
-              handleOpenChange(false)
-              onContinue()
-            }}
+            disabled={!file || loading}
+            onClick={() => file && onContinue(file)}
           >
-            Continuar
+            {loading ? "Validando..." : "Continuar"}
           </Button>
         </DialogFooter>
       </DialogContent>
