@@ -18,4 +18,17 @@ export interface Truck {
 export interface DistributionPlan {
   trucks: Truck[]
   sinCamion: Vehicle[]
+  /** Modelo que resolvió el plan, tal y como lo reporta el servidor. */
+  model: string
+  /** Milisegundos de inferencia + decodificación, medidos en el servidor. */
+  elapsedMs: number
+  /** Milisegundos de ida y vuelta completos, medidos en el navegador. */
+  roundTripMs: number
+  /** Cuántos vehículos aceptados se enviaron a distribuir. */
+  vehicleCount: number
+}
+
+export interface Health {
+  status: string
+  model: string
 }

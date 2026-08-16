@@ -24,7 +24,7 @@ esquemas queda en `/docs` (Swagger UI) y `/redoc`.
 |---|---|---|
 | `/api/health` | `GET` | Estado del servicio y **modelo en uso** |
 | `/api/manifest` | `POST` | Valida el manifiesto (CSV crudo o lista) contra la flota y devuelve el estado por vehículo |
-| `/api/distribute` | `POST` | Genera el plan de distribución para los vehículos aceptados |
+| `/api/distribute` | `POST` | Genera el plan de distribución para los vehículos aceptados, con el **modelo usado** y **cuánto tardó** |
 
 `/api/manifest` acepta el CSV del operador en `csv` (punto y coma o coma) o la
 lista ya estructurada en `vehicles`. En ambos casos hay que pasar `fleet`, las
@@ -35,6 +35,37 @@ capacidades de los camiones. Devuelve cada vehículo con `status` `accepted` o
 `/api/distribute` recibe los vehículos aceptados y la flota, y devuelve el plan:
 camiones (orden canónico, capacidad descendente) con sus vehículos, más la
 sección `sin_camion` con los que el modelo difiere por falta de espacio.
+
+## Cuánto tardó y con qué modelo
+
+Ambos `POST` cronometran su trabajo y lo devuelven en la respuesta, para poder
+comparar el coste en tiempo de los seis modelos sobre el mismo manifiesto:
+
+| Campo | En | Qué mide |
+|---|---|---|
+| `elapsed_ms` | `/api/manifest` | La validación. No interviene el modelo, así que son décimas de milisegundo |
+| `elapsed_ms` | `/api/distribute` | La inferencia y la decodificación del plan |
+| `model` | `/api/distribute` | Con qué modelo se resolvió, sin tener que consultar `/api/health` aparte |
+
+El cronómetro de `/api/distribute` arranca **después** de resolver la
+dependencia del servicio, así que no incluye la carga del artefacto —que
+ocurre una sola vez, en el primer uso.
+
+Aun así, **la primera petición no es comparable**: el calentamiento perezoso de
+torch, Keras y la caché de página del sistema la encarecen mucho. Medido sobre
+el mismo manifiesto de 8 vehículos y una flota de dos camiones de 6:
+
+| Modelo | Primera petición | Peticiones siguientes |
+|---|---|---|
+| XGBoost | 27.8 ms | ~20 ms |
+| LightGBM | 17.4 ms | ~2.9 ms |
+| Transformer | 817.6 ms | ~7.5-8.9 ms |
+
+Son cifras indicativas de una máquina y una corrida, no una medición
+controlada: sirven para ver el orden de magnitud del calentamiento, no para
+declarar un ganador. Lo que sí muestran es que la primera medición hay que
+descartarla —el transformer pasa de 818 ms a menos de 9—. El frontend lo
+advierte junto a los tiempos por el mismo motivo.
 
 ## Qué modelo responde
 

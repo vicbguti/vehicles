@@ -25,6 +25,7 @@ otro puerto). En producción se puede restringir vía ``ALLOWED_ORIGINS``.
 from __future__ import annotations
 
 import os
+import time
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -98,8 +99,10 @@ def validate_manifest_endpoint(
     if not vehicles:
         raise HTTPException(status_code=422, detail="El manifiesto está vacío")
 
+    started = time.perf_counter()
     validated = validate_manifest(vehicles, payload.fleet)
-    return ManifestOut(vehicles=validated)
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    return ManifestOut(vehicles=validated, elapsed_ms=elapsed_ms)
 
 
 @app.post("/api/distribute", response_model=DistributeOut)
@@ -116,10 +119,15 @@ def distribute_endpoint(
         raise HTTPException(status_code=422, detail="No hay vehículos válidos para distribuir")
 
     vehicles = [v.model_dump() for v in accepted]
+    # Se cronometra sólo la resolución del plan: `get_service` ya resolvió la
+    # dependencia (y, en el primer uso, la carga del artefacto) antes de entrar
+    # aquí, así que el tiempo medido es comparable entre peticiones.
+    started = time.perf_counter()
     try:
         trucks, assignment = service.distribute(vehicles, payload.fleet)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    elapsed_ms = (time.perf_counter() - started) * 1000
 
     # Diferidos: los vehículos válidos que el modelo no pudo colocar.
     deferred_cu = [v for v, a in zip(vehicles, assignment, strict=False) if a < 0]
@@ -135,4 +143,9 @@ def distribute_endpoint(
         )
         for t in trucks
     ]
-    return DistributeOut(trucks=truck_outs, sin_camion=SinCamionOut(vehicles=sin_camion_vehicles))
+    return DistributeOut(
+        trucks=truck_outs,
+        sin_camion=SinCamionOut(vehicles=sin_camion_vehicles),
+        model=service.model_name,
+        elapsed_ms=elapsed_ms,
+    )

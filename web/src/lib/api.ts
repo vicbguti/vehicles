@@ -1,6 +1,8 @@
-import type { DistributionPlan, Vehicle } from "@/lib/types"
+import type { DistributionPlan, Health, Vehicle } from "@/lib/types"
 
 const BASE_URL = "/api"
+
+const OFFLINE_MESSAGE = "No se pudo conectar con el servidor. Verifica que esté en ejecución."
 
 export class ApiError extends Error {
   constructor(message: string) {
@@ -9,16 +11,12 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, body: unknown): Promise<T> {
+async function send<T>(path: string, init: RequestInit): Promise<T> {
   let response: Response
   try {
-    response = await fetch(`${BASE_URL}${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
+    response = await fetch(`${BASE_URL}${path}`, init)
   } catch {
-    throw new ApiError("No se pudo conectar con el servidor. Verifica que esté en ejecución.")
+    throw new ApiError(OFFLINE_MESSAGE)
   }
 
   if (!response.ok) {
@@ -33,6 +31,20 @@ async function request<T>(path: string, body: unknown): Promise<T> {
   }
 
   return (await response.json()) as T
+}
+
+function request<T>(path: string, body: unknown): Promise<T> {
+  return send<T>(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+}
+
+/** Estado del servicio y modelo activo. `FLEET_LOADING_MODEL` se lee al
+ * arrancar el servidor, así que este valor sólo cambia si se reinicia. */
+export function getHealth(): Promise<Health> {
+  return send<Health>("/health", { method: "GET" })
 }
 
 export async function validateManifest(csv: string, fleet: number[]): Promise<Vehicle[]> {
@@ -52,12 +64,22 @@ export async function distributeVehicles(
       cu: v.cu,
       canton: v.canton,
     }))
+  const startedAt = performance.now()
   const payload = await request<{
     trucks: DistributionPlan["trucks"]
     sin_camion: { vehicles: Vehicle[] }
+    model: string
+    elapsed_ms: number
   }>("/distribute", {
     vehicles: accepted,
     fleet,
   })
-  return { trucks: payload.trucks, sinCamion: payload.sin_camion.vehicles }
+  return {
+    trucks: payload.trucks,
+    sinCamion: payload.sin_camion.vehicles,
+    model: payload.model,
+    elapsedMs: payload.elapsed_ms,
+    roundTripMs: performance.now() - startedAt,
+    vehicleCount: accepted.length,
+  }
 }

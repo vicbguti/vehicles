@@ -16,6 +16,7 @@ data/raw/SRI_Vehiculos_Nuevos_*.csv
 data/raw/SRI_Vehiculos_DD.xlsx
 data/processed/
 data/features/
+data/examples/
 
 # `data/episodes/` SÍ se versiona, y por eso no aparece arriba.
 #

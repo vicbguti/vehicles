@@ -2,6 +2,7 @@ import { useState } from "react"
 import { useNavigate } from "react-router-dom"
 import { FolderUp, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { ActiveModelBadge } from "@/components/ActiveModelBadge"
 import { ApiError, distributeVehicles, validateManifest } from "@/lib/api"
 import type { Vehicle } from "@/lib/types"
 import { FleetEditor } from "./FleetEditor"
@@ -60,6 +61,9 @@ export function ManifestoPage() {
           <p className="mt-1 text-sm text-muted-foreground">
             Manifiesto de vehículos a transportar
           </p>
+          <div className="mt-2">
+            <ActiveModelBadge />
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">

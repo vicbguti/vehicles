@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator"
 import type { DistributionPlan, Truck as TruckPlan } from "@/lib/types"
 import { TruckSection } from "./TruckSection"
 import { DistributionTable } from "./DistributionTable"
+import { PlanSummary } from "./PlanSummary"
 
 export function DistributionPage() {
   const navigate = useNavigate()
@@ -64,6 +65,8 @@ export function DistributionPage() {
         </p>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">Distribución</h1>
       </header>
+
+      {plan && <PlanSummary plan={{ ...plan, trucks }} />}
 
       {trucks.map((truck, index) => (
         <div key={truck.id} className="flex flex-col gap-8">

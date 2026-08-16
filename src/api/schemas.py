@@ -48,6 +48,10 @@ class ManifestIn(BaseModel):
 
 class ManifestOut(BaseModel):
     vehicles: list[VehicleOut]
+    elapsed_ms: float = Field(
+        default=0.0,
+        description="Milisegundos de la validación en el servidor. No interviene el modelo.",
+    )
 
 
 class DistributeIn(BaseModel):
@@ -70,7 +74,16 @@ class SinCamionOut(BaseModel):
 
 
 class DistributeOut(BaseModel):
-    """Plan de distribución: camiones (canónicos) + vehículos diferidos."""
+    """Plan de distribución: camiones (canónicos) + vehículos diferidos.
+
+    Lleva además con qué modelo se resolvió y cuánto tardó, para poder
+    comparar el coste en tiempo de los seis modelos sobre el mismo manifiesto.
+    """
 
     trucks: list[TruckOut]
     sin_camion: SinCamionOut
+    model: str = Field(description="Modelo que resolvió el plan (FLEET_LOADING_MODEL).")
+    elapsed_ms: float = Field(
+        description="Milisegundos del plan: sólo la inferencia y la decodificación. "
+        "Excluye la carga del artefacto, que ocurre una vez al primer uso.",
+    )

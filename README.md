@@ -61,8 +61,8 @@ FLEET_LOADING_MODEL=mlp fleet_loading/.venv/bin/python \
 `GET /api/health` confirma cuál quedó activo. El MLP requiere Keras (usa el
 backend de torch si no hay TensorFlow). Endpoints: `POST /api/manifest`
 (valida el CSV y la flota) y
-`POST /api/distribute` (genera el plan). Detalle en
-[`docs/api.md`](./docs/api.md).
+`POST /api/distribute` (genera el plan, y devuelve con qué modelo y en cuántos
+milisegundos). Detalle en [`docs/api.md`](./docs/api.md).
 
 ## Uso
 
