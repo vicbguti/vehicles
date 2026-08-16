@@ -14,7 +14,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from src.api.models import ModelService
+from src.api.models import ModelService  # noqa: E402
 
 MODELS = {
     "xgboost": "xgb",
@@ -48,8 +48,10 @@ def main() -> None:
     for t in trucks:
         cu = sum(v["cu"] for v in t["vehicles"])
         ok = cu <= t["capacity"] + 1e-9
-        print(f"  camion={t['id']} capacidad={t['capacity']} usado={cu:.2f} "
-              f"n={len(t['vehicles'])} factible={ok}")
+        print(
+            f"  camion={t['id']} capacidad={t['capacity']} usado={cu:.2f} "
+            f"n={len(t['vehicles'])} factible={ok}"
+        )
         assert ok, f"viola capacidad en {t['id']}"
     assert n_deferred >= 0
     print("OK")

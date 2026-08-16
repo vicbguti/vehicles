@@ -32,8 +32,8 @@ from __future__ import annotations
 import json
 import os
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
@@ -113,9 +113,7 @@ class ModelService:
         if model_name == "mlp":
             import keras
 
-            self._classifier = keras.models.load_model(
-                self.artifact_dir / "model.keras"
-            )
+            self._classifier = keras.models.load_model(self.artifact_dir / "model.keras")
             self._predict_proba: Callable | None = None
         elif model_name == "attention":
             self._classifier = None
@@ -141,9 +139,7 @@ class ModelService:
             results = self.artifact_dir / "feature_schema.json"
             key = "decoder_policy"
         else:
-            stem = {"xgboost": "xgb", "lightgbm": "lgb", "attention": "att"}[
-                self.model_name
-            ]
+            stem = {"xgboost": "xgb", "lightgbm": "lgb", "attention": "att"}[self.model_name]
             results = ARTIFACT_ROOT / "results" / f"{stem}_results.json"
             key = f"{stem}_decoder_policy"
         if not results.exists():
@@ -205,13 +201,10 @@ class ModelService:
             # scripts/evaluate_mlp.py (modo extrapolación).
             from src.modeling.features import as_model_inputs
 
-            return np.asarray(
-                self._classifier.predict(as_model_inputs(arrays), verbose=0)
-            )
+            return np.asarray(self._classifier.predict(as_model_inputs(arrays), verbose=0))
 
         if self.model_name == "attention":
             import torch
-
             from fleet_loading.pipelines.training.attention_model import (
                 PairwiseAttentionModel,
                 collate_episodes,
@@ -267,11 +260,13 @@ class ModelService:
                 logits_by_ep,
             )
 
-        episodes_tensors = [e for e in episodes]
         return stack_episode_logits(
             episodes,
             arrays,
-            {i: logits_from_proba(ep, self.scaler, self._predict_proba) for i, ep in enumerate(episodes_tensors)},
+            {
+                i: logits_from_proba(ep, self.scaler, self._predict_proba)
+                for i, ep in enumerate(episodes)
+            },
         )
 
     def distribute(
@@ -324,9 +319,7 @@ class ModelService:
             for i, cap in enumerate(fleet.capacities)
         ]
 
-        sorted_vehicles = sorted(
-            enumerate(vehicles), key=lambda iv: iv[1]["identificador"]
-        )
+        sorted_vehicles = sorted(enumerate(vehicles), key=lambda iv: iv[1]["identificador"])
         # `decode_episode` devuelve la asignación en el orden interno de filas
         # del modelo, que en ambos tipos es uid ascendente. Se reindexa al
         # orden de entrada para que el plan y el `assignment` devuelto queden

@@ -54,7 +54,9 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         o.strip()
-        for o in os.environ.get("ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173").split(",")
+        for o in os.environ.get(
+            "ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+        ).split(",")
         if o.strip()
     ],
     allow_credentials=True,
@@ -111,9 +113,7 @@ def distribute_endpoint(
 
     accepted = [v for v in payload.vehicles if v.cu > 0]
     if not accepted:
-        raise HTTPException(
-            status_code=422, detail="No hay vehículos válidos para distribuir"
-        )
+        raise HTTPException(status_code=422, detail="No hay vehículos válidos para distribuir")
 
     vehicles = [v.model_dump() for v in accepted]
     try:
@@ -124,8 +124,7 @@ def distribute_endpoint(
     # Diferidos: los vehículos válidos que el modelo no pudo colocar.
     deferred_cu = [v for v, a in zip(vehicles, assignment, strict=False) if a < 0]
     sin_camion_vehicles = [
-        VehicleOut(**v, status="rejected", reason="Sin espacio disponible")
-        for v in deferred_cu
+        VehicleOut(**v, status="rejected", reason="Sin espacio disponible") for v in deferred_cu
     ]
 
     truck_outs = [

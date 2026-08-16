@@ -111,6 +111,15 @@ exclude = ["*.md"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.per-file-ignores]
+# B008 prohíbe llamar a una función en un valor por omisión, porque en general
+# se evalúa una sola vez al definir. En FastAPI `Depends(...)` es justamente eso
+# a propósito: el framework lo lee de la firma para resolver la dependencia por
+# petición. Es la forma documentada de declararla, así que la regla no aplica
+# aquí. Se exime el archivo y no cada línea para que la razón quede escrita una
+# vez y no se copie un `noqa` sin entenderlo.
+"src/api/main.py" = ["B008"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

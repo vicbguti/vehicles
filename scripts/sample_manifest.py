@@ -189,9 +189,7 @@ def main() -> None:
     else:
         sys.stdout.write(csv_text)
         if not args.no_provenance:
-            sys.stderr.write(
-                json.dumps(provenance, indent=2, ensure_ascii=False) + "\n"
-            )
+            sys.stderr.write(json.dumps(provenance, indent=2, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":
