@@ -79,7 +79,10 @@ aprende esa clase; con 4,97 % la aprende mal; con 15,84 % la aprende.
 | Reducciones automáticas de la tasa de aprendizaje | 6 (de 1e-3 a 1,6e-5) |
 
 La parada temprana se activó en la época 51 y restauró los pesos de la 41. Curvas en
-`artifacts/mlp/learning_curves.png`, historial completo en `training_history.csv`.
+`artifacts/mlp/learning_curves.png`, historial completo en `training_history.csv`, con la
+columna `step_unit` —aquí `epoch`— del formato común a los seis modelos. Matriz de
+confusión sobre validación en `confusion_matrix.png` y sobre prueba en
+`confusion_matrix_test.png`; las dos se redibujan sin reentrenar con `just figures`.
 
 ### 2.1 Sobre la separación aparente entre las curvas
 

@@ -367,6 +367,16 @@ uv run python scripts/teacher_self_agreement.py --years 2026
 uv run pytest tests/modeling                        # 80 pruebas
 ```
 
-Artefactos persistidos en `artifacts/mlp/`: `model.keras`, `feature_schema.json`,
-`label_mapping.json`, `metrics.json`, `training_report.json`, `training_history.csv`,
-`model_summary.txt`, `learning_curves.png`, `confusion_matrix.png`.
+Artefactos persistidos en `artifacts/mlp/`: `model.keras`, `best_model.keras`,
+`feature_schema.json`, `label_mapping.json`, `metrics.json`,
+`training_report.json`, `model_summary.txt`, `training_history.csv`,
+`learning_curves.png`, `confusion_matrix.png` (validación) y
+`confusion_matrix_test.png` (prueba, 2026).
+
+Las dos matrices van por separado a propósito: la de **validación** es la
+partición que publica la [tabla comparativa](../index.md) y por tanto la única
+que se puede poner al lado de las de los otros cinco modelos; la de prueba es el
+resultado final del MLP. `training_history.csv` lleva la columna `step_unit`
+—aquí `epoch`— del formato común a los seis modelos
+([métricas](../metricas.md#curvas-de-entrenamiento)); las figuras se redibujan
+sin reentrenar con `just figures`.

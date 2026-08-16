@@ -25,9 +25,16 @@ uv sync
 git lfs install --local && git lfs pull
 ```
 
-El paso de LFS no es opcional. Los diez CSV de `data/clean/` (535 MB) se
-almacenan como punteros; sin descargarlos, el pipeline lee 133 bytes de texto
-por archivo y produce resultados sin sentido **sin fallar**. Para comprobarlo:
+**Para entrenar y evaluar los modelos, LFS no hace falta.** El conjunto de
+ejemplos —`data/episodes/`, 11 MB— viene versionado en el clon, así que
+`train_mlp.py`, `train_classical.py` y el pipeline Kedro funcionan de inmediato.
+`scripts/build_scenarios.py` sólo se ejecuta para **reconstruir** los episodios
+desde cero (~30 min), y sólo eso necesita los CSV.
+
+El paso de LFS sí es obligatorio para el resto: perfilado, reportes y
+reconstrucción de datos derivados. Los diez CSV de `data/clean/` (535 MB) se
+almacenan como punteros; sin descargarlos, esas etapas leen 133 bytes de texto
+por archivo y producen resultados sin sentido **sin fallar**. Para comprobarlo:
 
 ```bash
 head -c 40 data/clean/SRI_Vehiculos_Nuevos_2025.csv   # no debe decir "version https://git-lfs..."
@@ -60,17 +67,22 @@ backend de torch si no hay TensorFlow). Endpoints: `POST /api/manifest`
 ## Uso
 
 ```bash
-# Datos derivados
-uv run python scripts/build_vehicle_features.py        # CSV -> data/features/
-uv run python scripts/build_scenarios.py --limit 200   # -> data/episodes/ (completo: ~30 min)
-
-# MLP
+# MLP  (data/episodes/ ya viene en el clon: nada que construir antes)
 uv run python scripts/train_mlp.py
 uv run python scripts/evaluate_mlp.py
+
+# Random Forest y regresión logística
+uv run python scripts/train_classical.py --model rf --split time
+uv run python scripts/train_classical.py --model rf \
+    --refit-from artifacts/rf/training_report.json   # reajusta sin repetir Optuna
 
 # XGBoost, LightGBM y transformer (pipeline Kedro)
 uv sync --extra gbt --extra attention --extra kedro
 cd fleet_loading && uv run --project .. kedro run    # o: just train-fleet
+
+# Reconstruir los datos derivados desde los CSV (requiere git lfs pull)
+uv run python scripts/build_vehicle_features.py        # CSV -> data/features/
+uv run python scripts/build_scenarios.py --limit 200   # -> data/episodes/ (completo: ~30 min)
 
 # Perfilado y reportes del dataset
 uv run python scripts/run_pipeline.py
@@ -93,7 +105,7 @@ just docs-build   # mkdocs build --strict: falla ante cualquier enlace roto
 just --list       # todas las recetas
 ```
 
-Lo mismo que verifica la CI. Las 447 pruebas incluyen 325 del maestro exacto y
+Lo mismo que verifica la CI. Las 479 pruebas incluyen 325 del maestro exacto y
 las del decodificador, todas validadas por mutación —se comprobó que fallan ante
 regresiones deliberadas, no solo que pasan en verde.
 

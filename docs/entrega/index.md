@@ -82,7 +82,7 @@ uv run python scripts/evaluate_mlp.py               # incluye la ablación de lo
 uv run python scripts/teacher_self_agreement.py --years 2026
 uv run python scripts/label_ceiling.py              # techo exacto de exactitud
 uv run python scripts/sweep_mlp.py                  # 8 configuraciones, ~25 min
-uv run pytest                                       # 447 pruebas
+uv run pytest                                       # 479 pruebas
 ```
 
 > El experimento del orden de la flota
@@ -115,10 +115,11 @@ etiquetar. Ese cambio obliga a **regenerar el conjunto y reentrenar los cinco mo
 ```
 config/mlp.yaml
 pyproject.toml + uv.lock
-src/modeling/{canonicalization,dataset,features,mlp_classifier,capacity_decoder,metrics}.py
+src/modeling/{canonicalization,dataset,features,mlp_classifier,capacity_decoder,metrics,figures}.py
 scripts/{train_mlp,evaluate_mlp,sweep_mlp,build_extrapolation_set,teacher_self_agreement}.py
-scripts/label_ceiling.py
-tests/                     447 pruebas (325 del maestro exacto)
-artifacts/mlp/             modelo, métricas, curvas, matriz de confusión
+scripts/{label_ceiling,report_figures}.py
+data/episodes/             el conjunto de ejemplos, versionado (11 MB)
+tests/                     479 pruebas (325 del maestro exacto)
+artifacts/mlp/             modelo, métricas, curvas y matrices (validación y prueba)
 artifacts/mlp/fleet_order_experiment/   evidencia del §6 del documento 06
 ```

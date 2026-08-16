@@ -27,7 +27,8 @@ de esto.
 | `canonicalization.py` | Reindexa la flota por capacidad descendente. `CAMION_1` significa «el camión más grande», no «el que salió primero del generador» |
 | `features.py` | Tensores por par `(vehículo, camión)`. Excluye deliberadamente `canton`, `uid`, `truck_id` y la posición dentro de la clase: solo permitirían memorizar |
 | `capacity_decoder.py` | `decode_episode` — decodificador voraz que respeta la capacidad. El plan es factible por construcción: un vehículo solo se coloca si cabe |
-| `metrics.py` | Métricas por episodio contra el maestro exacto, más la línea base greedy |
+| `metrics.py` | **El único sitio donde se calcula una cifra publicable.** Métricas por episodio contra el maestro exacto, más la línea base greedy. Los seis modelos pasan por `aggregate()` |
+| `figures.py` | Formato común del historial de entrenamiento y de las figuras. La unidad del eje viaja dentro del CSV, así que ninguna gráfica se puede rotular mal |
 | `dataset.py` | Carga de episodios y `assert_no_episode_leakage` |
 | `protocol.py` | **El único sitio donde se construye una partición.** Holdout temporal compartido por los seis modelos |
 | `flat_features.py` | Aplana los tensores por par a una fila de ancho fijo, para los clasificadores multiclase de scikit-learn. Ver [modelos clásicos](modelo/modelos_clasicos.md) |

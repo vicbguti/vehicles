@@ -25,9 +25,36 @@
     ([modelos clásicos](../modelo/modelos_clasicos.md)), que entran a la misma
     tabla por la misma puerta: `training_report.json` declara su
     `split_strategy` y el generador **rechaza publicar** una fila medida con
-    otra partición. Que sumar dos modelos no haya costado una segunda
-    implementación de las métricas es la prueba de que lo que este documento
-    proponía en §3 era lo correcto.
+    otra partición.
+
+!!! danger "La unificación estaba a medias, y esta página lo daba por cerrado"
+    Hasta el 16 de agosto de 2026 el párrafo de arriba terminaba diciendo que
+    sumar dos modelos no había costado una segunda implementación de las
+    métricas, y lo llamaba la prueba de que la §3 era correcta. Era cierto de las
+    métricas **operativas** y falso de las de **clasificación**.
+
+    La exactitud y el F1 de diferir nunca entraron a `aggregate()`: se
+    calculaban tres veces por fuera, y la tabla llenaba una sola columna con
+    `f1_defer` en tres filas y con `macro_f1` en las otras tres. Encima la fila
+    del transformer venía de un argmax crudo tomado en su mejor época, cuando
+    las demás eran post-decodificador, y por eso aparecía como el modelo más
+    exacto del cuadro.
+
+    Es **el mismo error que esta página diagnosticó**, por el otro eje: no con
+    qué datos se mide, sino qué se mide. La puerta que se construyó entonces
+    —`_exigir_protocolo_temporal`— vigilaba la partición y nada más; y ni
+    siquiera cubría las tres filas de Kedro, cuyos JSON no traían
+    `split_strategy`, así que la comprobación no llegaba a ejecutarse sobre
+    ellas.
+
+    Corregido: `aggregate()` emite `f1_defer` y `macro_f1` para los seis, las
+    seis filas leen del mismo bloque de agregados, `_exigir_misma_metrica`
+    rechaza una fila con otras claves y la puerta de partición ya cubre las
+    seis. El detalle está en [métricas](../metricas.md#agregados-aggregate).
+
+    La lección que deja: **una puerta que vigila un eje no vigila los demás**, y
+    declarar «resuelto» sobre la evidencia de un solo eje es cómo se sostuvo
+    este error dos semanas más.
 
     Una salvedad que este documento no había anticipado: la **latencia**
     del MLP sigue sin ser comparable, porque `evaluate_mlp.py` cronometra
