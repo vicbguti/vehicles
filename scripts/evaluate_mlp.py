@@ -40,48 +40,13 @@ from src.modeling.features import (  # noqa: E402
     build_all_episodes,
     build_model_arrays,
 )
+from src.modeling.figures import plot_confusion_matrix  # noqa: E402
 from src.modeling.metrics import aggregate, evaluate_greedy, evaluate_model  # noqa: E402
 from src.modeling.protocol import SplitConfig  # noqa: E402
 
 DEFAULT_MODEL_DIR = REPO_ROOT / "artifacts" / "mlp"
 DEFAULT_EPISODES_DIR = REPO_ROOT / "data" / "episodes"
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config" / "mlp.yaml"
-
-
-def plot_confusion(matrix: list[list[int]], labels: list[str], out_path: Path) -> None:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
-
-    m = np.asarray(matrix, dtype=float)
-    # Normalizada por fila: sin esto, MOTOCICLETA/CAMION_1 aplasta todo lo demás.
-    with np.errstate(invalid="ignore"):
-        norm = np.where(m.sum(axis=1, keepdims=True) > 0, m / m.sum(axis=1, keepdims=True), 0.0)
-
-    fig, ax = plt.subplots(figsize=(6.5, 5.5))
-    im = ax.imshow(norm, cmap="Blues", vmin=0, vmax=1)
-    ax.set_xticks(range(len(labels)), labels, rotation=45, ha="right")
-    ax.set_yticks(range(len(labels)), labels)
-    ax.set_xlabel("Predicho por el modelo")
-    ax.set_ylabel("Maestro exacto")
-    ax.set_title("Matriz de confusión (normalizada por fila)\nEtiquetas canónicas por capacidad")
-
-    for i in range(len(labels)):
-        for j in range(len(labels)):
-            ax.text(
-                j,
-                i,
-                f"{norm[i, j]:.2f}\n{int(m[i, j]):,}",
-                ha="center",
-                va="center",
-                fontsize=7,
-                color="white" if norm[i, j] > 0.5 else "black",
-            )
-    fig.colorbar(im, ax=ax, label="Proporción de la fila")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
 
 
 def measure_latency(model, episodes, arrays, policy: str, sample: int = 200) -> dict:
@@ -270,8 +235,23 @@ def main() -> None:
         n_labels,
     )
 
-    plot_confusion(
-        model_metrics["test"]["confusion_matrix"], labels, args.model_dir / "confusion_matrix.png"
+    # Dos matrices, y por separado a propósito. La de **validación** es la que
+    # entra a la tabla comparativa: es la partición sobre la que se miden los
+    # seis modelos, así que es la única que se puede poner al lado de las otras
+    # cinco. La de prueba es el resultado final del MLP y se publica igual, pero
+    # con su propio nombre -- mezclarlas sería repetir en formato figura el error
+    # de publicar dos mediciones distintas bajo el mismo encabezado.
+    plot_confusion_matrix(
+        model_metrics["val"]["confusion_matrix"],
+        labels,
+        "MLP (Keras) — validación",
+        args.model_dir / "confusion_matrix.png",
+    )
+    plot_confusion_matrix(
+        model_metrics["test"]["confusion_matrix"],
+        labels,
+        "MLP (Keras) — prueba (2026)",
+        args.model_dir / "confusion_matrix_test.png",
     )
 
     payload = {

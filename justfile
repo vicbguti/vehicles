@@ -98,6 +98,13 @@ train-fleet:
 fleet-figures:
     cd fleet_loading && uv run --project .. kedro run --nodes report_confusion_matrices
 
+# Las doce figuras del póster --seis curvas y seis matrices de confusión-- desde
+# los CSV y JSON ya guardados. No entrena nada: las curvas se releen de
+# `training_history.csv` y las matrices salen de la `confusion_matrix` que cada
+# modelo publica en su JSON. Ver docs/metricas.md.
+figures:
+    uv run python scripts/report_figures.py
+
 mlflow:  # una sola base en la raíz: la comparten el pipeline y train_classical.py
     uv run mlflow ui --backend-store-uri sqlite:///mlflow.db
 

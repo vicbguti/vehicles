@@ -44,6 +44,7 @@ from src.modeling.features import (  # noqa: E402
     build_all_episodes,
     build_model_arrays,
 )
+from src.modeling.figures import plot_model_curves, write_history  # noqa: E402
 from src.modeling.mlp_classifier import (  # noqa: E402
     MLPConfig,
     build_callbacks,
@@ -75,48 +76,30 @@ def flatten_model_config(raw: dict) -> MLPConfig:
     return MLPConfig.from_dict(merged)
 
 
-def plot_learning_curves(history: dict, out_path: Path) -> None:
-    import matplotlib
+def guardar_curvas(history: dict, out_dir: Path) -> None:
+    """Historial y figura, en el formato común a los seis modelos.
 
-    matplotlib.use("Agg")
-    import matplotlib.pyplot as plt
+    `CSVLogger` ya fue escribiendo el archivo época a época --eso es lo que
+    salva el historial si el entrenamiento se cae a la mitad--, pero lo hace en
+    su propio formato, sin la columna `step_unit`. Se reescribe al terminar para
+    que el archivo publicado sea el mismo que el de los otros cinco modelos.
 
-    fig, axes = plt.subplots(1, 2, figsize=(11, 4.6))
-    axes[0].plot(history["loss"], label="entrenamiento (ponderada)")
-    axes[0].plot(history["val_loss"], label="validación (sin ponderar)")
-    axes[0].set_title("Pérdida (entropía cruzada)")
-    axes[0].set_xlabel("Época")
-    axes[0].legend()
-    axes[0].grid(alpha=0.3)
-    # La separación entre ambas curvas NO es sobreajuste: el entrenamiento aplica
-    # `sample_weight` para compensar el desbalance de SIN_CAMION y la validación no,
-    # así que las dos series no están en la misma escala. Evaluadas ambas sin pesos,
-    # la pérdida de validación resulta incluso menor que la de entrenamiento.
-    axes[0].text(
-        0.5,
-        -0.30,
-        "Las dos series no son comparables directamente: el entrenamiento aplica pesos de\n"
-        "clase y la validación no. Sin pesos, la pérdida de validación es menor que la de\n"
-        "entrenamiento (ver training_report.json → unweighted_loss).",
-        transform=axes[0].transAxes,
-        ha="center",
-        va="top",
-        fontsize=7.5,
-        style="italic",
-    )
-
-    key = "raw_assignment_accuracy"
-    axes[1].plot(history[key], label="entrenamiento")
-    axes[1].plot(history[f"val_{key}"], label="validación")
-    axes[1].set_title("Exactitud cruda de asignación")
-    axes[1].set_xlabel("Época")
-    axes[1].legend()
-    axes[1].grid(alpha=0.3)
-
-    fig.suptitle("Curvas de aprendizaje — MLP por par (vehículo, camión)")
-    fig.tight_layout()
-    fig.savefig(out_path, dpi=150)
-    plt.close(fig)
+    `learning_rate` sale de ReduceLROnPlateau y se conserva: los escalones de la
+    tasa explican los codos de la curva de pérdida, que si no se leen como ruido.
+    """
+    series = [
+        "loss",
+        "val_loss",
+        "raw_assignment_accuracy",
+        "val_raw_assignment_accuracy",
+        "learning_rate",
+    ]
+    filas = [
+        {k: float(history[k][i]) for k in series if k in history}
+        for i in range(len(history["loss"]))
+    ]
+    write_history(out_dir / "training_history.csv", filas, "epoch")
+    plot_model_curves("mlp", filas, "epoch", out_dir)
 
 
 def main() -> None:
@@ -218,7 +201,7 @@ def main() -> None:
     elapsed = time.perf_counter() - t0
 
     model.save(out_dir / "model.keras")
-    plot_learning_curves(history.history, out_dir / "learning_curves.png")
+    guardar_curvas(history.history, out_dir)
 
     # El historial compara pérdida de entrenamiento PONDERADA contra validación SIN
     # ponderar, así que su separación no mide sobreajuste. Se reevalúan las tres
