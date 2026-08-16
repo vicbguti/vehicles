@@ -8,19 +8,27 @@ guardado en ``pairwise_schema.json`` y el decoder con capacidad. Nada de esto se
 reimplementa aquí; este módulo sólo orquesta lo existente para un único
 manifiesto.
 
-Los tres modelos servidos (XGBoost, LightGBM y attention) son *pairwise*: el
-eje de camiones es dinámico, así que **no hay límite de camiones ni de
-capacidad**. La única diferencia entre ellos es cómo se cargan los logits.
+Los cuatro modelos servidos (XGBoost, LightGBM, el transformer de atención y
+el MLP de Keras) son *pairwise*: el eje de camiones es dinámico, así que **no
+hay límite de camiones ni de capacidad**. La diferencia entre ellos está sólo
+en cómo se cargan los logits:
 
-Los otros tres del repositorio quedan fuera: el MLP es pairwise pero exige
-TensorFlow/Keras y vive en `artifacts/mlp/` con otro formato de artefacto; RF
-y regresión logística son de ancho fijo (flota rellenada a ``max_trucks``),
-con lo que no generalizan por encima del rango de entrenamiento.
+* XGBoost y LightGBM: clasificador binario por filas de opción
+  (`logits_from_proba`).
+* Attention: head de atención sobre `(vehículo, camión)`.
+* MLP: puntúa el lote completo (`pair_features`, `defer_features`,
+  `mask_bias`) y devuelve logits crudos, igual que `scripts/evaluate_mlp.py`.
+  Requiere Keras (usa el backend de torch si no hay TensorFlow).
+
+Los dos clásicos del repositorio quedan fuera: RF y regresión logística son de
+ancho fijo (flota rellenada a ``max_trucks``), con lo que no generalizan por
+encima del rango de entrenamiento.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Callable
@@ -41,8 +49,26 @@ from src.modeling.metrics import episode_logits  # noqa: E402
 
 ARTIFACT_ROOT = REPO_ROOT / "artifacts" / "fleet_loading"
 
+# El MLP vive en artifacts/mlp/ con otro formato de artefacto; el resto, en
+# artifacts/fleet_loading/<modelo>/ con pairwise_schema.json.
+ARTIFACT_DIRS = {
+    "xgboost": ARTIFACT_ROOT / "xgboost",
+    "lightgbm": ARTIFACT_ROOT / "lightgbm",
+    "attention": ARTIFACT_ROOT / "attention",
+    "mlp": REPO_ROOT / "artifacts" / "mlp",
+}
+SCHEMA_FILES = {
+    "xgboost": "pairwise_schema.json",
+    "lightgbm": "pairwise_schema.json",
+    "attention": "pairwise_schema.json",
+    "mlp": "feature_schema.json",
+}
+
 # Política de decodificación por defecto (objetivo primario: contar vehículos).
 DEFAULT_POLICY = "count"
+
+# Keras 3 sin TensorFlow usa el backend de torch (ya presente en el entorno).
+os.environ.setdefault("KERAS_BACKEND", "torch")
 
 
 class ModelUnavailableError(RuntimeError):
@@ -54,20 +80,31 @@ class ModelService:
 
     def __init__(self, model_name: str = "xgboost") -> None:
         self.model_name = model_name
-        self.artifact_dir = ARTIFACT_ROOT / model_name
+        if model_name not in ARTIFACT_DIRS:
+            raise ModelUnavailableError(
+                f"Modelo desconocido: {model_name!r}. Opciones: {sorted(ARTIFACT_DIRS)}"
+            )
+        self.artifact_dir = ARTIFACT_DIRS[model_name]
         if not self.artifact_dir.exists():
             raise ModelUnavailableError(
                 f"No hay artefactos para el modelo {model_name!r} en {self.artifact_dir}"
             )
 
         schema = json.loads(
-            (self.artifact_dir / "pairwise_schema.json").read_text(encoding="utf-8")
+            (self.artifact_dir / SCHEMA_FILES[model_name]).read_text(encoding="utf-8")
         )
         self.classes: list[str] = schema["classes"]
         self.scaler = BlockScaler.from_dict(schema["blocks"])
         self._policy = self._load_policy()
 
-        if model_name == "attention":
+        if model_name == "mlp":
+            import keras
+
+            self._classifier = keras.models.load_model(
+                self.artifact_dir / "model.keras"
+            )
+            self._predict_proba: Callable | None = None
+        elif model_name == "attention":
             self._classifier = None
             self._predict_proba: Callable | None = None
         else:
@@ -78,14 +115,19 @@ class ModelService:
 
     def _load_policy(self) -> str:
         """Política registrada en los resultados medidos, si existe."""
-        stem = {"xgboost": "xgb", "lightgbm": "lgb", "attention": "att"}.get(
-            self.model_name, self.model_name[:3]
-        )
-        results = ARTIFACT_ROOT / "results" / f"{stem}_results.json"
+        if self.model_name == "mlp":
+            results = self.artifact_dir / "metrics.json"
+            key = "decoder_policy_selected"
+        else:
+            stem = {"xgboost": "xgb", "lightgbm": "lgb", "attention": "att"}[
+                self.model_name
+            ]
+            results = ARTIFACT_ROOT / "results" / f"{stem}_results.json"
+            key = f"{stem}_decoder_policy"
         if not results.exists():
             return DEFAULT_POLICY
         payload = json.loads(results.read_text(encoding="utf-8"))
-        return payload.get(f"{stem}_decoder_policy", DEFAULT_POLICY)
+        return payload.get(key, DEFAULT_POLICY)
 
     def _episode_from_manifest(
         self,
@@ -125,6 +167,16 @@ class ModelService:
             logits_from_proba,
             stack_episode_logits,
         )
+
+        if self.model_name == "mlp":
+            # El MLP puntúa el lote completo con sus tres entradas y devuelve
+            # logits crudos (B, 1+T) ya en el espacio canónico. Mismo flujo que
+            # scripts/evaluate_mlp.py (modo extrapolación).
+            from src.modeling.features import as_model_inputs
+
+            return np.asarray(
+                self._classifier.predict(as_model_inputs(arrays), verbose=0)
+            )
 
         if self.model_name == "attention":
             import torch

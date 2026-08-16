@@ -38,21 +38,21 @@ sección `sin_camion` con los que el modelo difiere por falta de espacio.
 
 ## Qué modelo responde
 
-Se sirven los tres modelos *pairwise* del pipeline Kedro (XGBoost, LightGBM y
-el transformer de atención). El modelo en uso se elige **al arrancar** con la
+Se sirven los **cuatro modelos *pairwise***: XGBoost, LightGBM, el transformer
+de atención y el MLP de Keras. El modelo en uso se elige **al arrancar** con la
 variable de entorno `FLEET_LOADING_MODEL`; sin ella, el valor por defecto es
 `xgboost`:
 
 ```bash
-FLEET_LOADING_MODEL=attention fleet_loading/.venv/bin/python \
+FLEET_LOADING_MODEL=mlp fleet_loading/.venv/bin/python \
     -m uvicorn src.api.main:app --port 8000
 ```
 
-El nombre debe coincidir con una carpeta de `artifacts/fleet_loading/`
-(`xgboost`, `lightgbm` o `attention`). Si no existe, el servicio responde
-`503` al primer uso. La API carga el modelo la primera vez que se pide
-(*lazy*), así que el valor de la variable solo se lee en el arranque del
-proceso; cambiarla requiere reiniciar.
+El nombre debe coincidir con una de las carpetas de artefactos (`xgboost`,
+`lightgbm`, `attention` en `artifacts/fleet_loading/`, o `mlp` en
+`artifacts/mlp/`). Si no existe, el servicio responde `503` al primer uso. La
+API carga el modelo la primera vez que se pide (*lazy*), así que el valor de la
+variable solo se lee en el arranque del proceso; cambiarla requiere reiniciar.
 
 Para confirmar cuál quedó activo:
 
@@ -62,23 +62,32 @@ curl http://localhost:8000/api/health
 ```
 
 La política de decodificación no se configura: se lee la registrada en los
-resultados medidos de cada modelo (`artifacts/fleet_loading/results/*.json`)
-y, si no existe, se usa `count` — el objetivo primario del caso de uso es
-maximizar cuántos vehículos se transportan.
+resultados medidos de cada modelo (`artifacts/fleet_loading/results/*.json`, o
+`artifacts/mlp/metrics.json` para el MLP) y, si no existe, se usa `count` — el
+objetivo primario del caso de uso es maximizar cuántos vehículos se
+transportan.
 
-### Los otros modelos y por qué no se sirven
+### El MLP: mismo rol, distinto cargador
 
-El repositorio entrena seis. Los otros tres quedan fuera por razones distintas:
+El MLP es *pairwise* y consume los mismos tensores canónicos, pero puntúa el
+lote completo (`pair_features`, `defer_features`, `mask_bias`) y devuelve
+logits crudos, igual que `scripts/evaluate_mlp.py`. Requiere **Keras**: si el
+entorno de servicio no tiene TensorFlow, se usa el backend de torch (ya
+presente). El artefacto vive en `artifacts/mlp/` con su propio formato
+(`feature_schema.json` + `model.keras`), que `ModelService` ya lee.
+
+### Los que no se sirven y por qué
+
+Quedan dos modelos fuera, ambos de ancho fijo:
 
 | Modelo | Formulación | ¿Por qué no se sirve? |
 |---|---|---|
-| MLP (Keras) | *pairwise* | Es pairwise y serviría igual, pero requiere TensorFlow/Keras, que la API no carga (el entorno de servicio es el de `fleet_loading`). Su artefacto además vive en `artifacts/mlp/` con otro formato (`feature_schema.json` + `.keras`) que `ModelService` no lee. Es el candidato natural si algún día se quiere servir |
 | Random Forest | ancho fijo | Clasificador multiclase con la flota rellenada a `max_trucks`; no generaliza por encima del rango de entrenamiento. Y su artefacto ni siquiera guarda el modelo (`artifacts/rf/` solo tiene el esquema y el reporte) |
 | Regresión logística | ancho fijo | Igual que el RF: la flota rellenada a `max_trucks` le pone un tope duro que este servicio no aplica |
 
 ## Sin límite de camiones ni de capacidad
 
-Los tres modelos servidos son *pairwise*: su eje de camiones es dinámico
+Los cuatro modelos servidos son *pairwise*: su eje de camiones es dinámico
 (`None` en la arquitectura), así que la misma flota admite cualquier número de
 camiones y cualquier capacidad sin reentrenar. Los clásicos (Random Forest y
 regresión logística) **no** se sirven: su formulación de ancho fijo los acota
