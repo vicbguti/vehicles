@@ -100,3 +100,35 @@ eje de camiones dinámico (`None` en la arquitectura), así que la misma flota
 admite **cualquier número de camiones y cualquier capacidad** sin reentrenar.
 RF y regresión logística son de ancho fijo: su tope real (`max_trucks`) es
 parte del artefacto y lo aplica el propio servicio.
+
+## Probar con manifiestos propios
+
+`scripts/sample_manifest.py` genera un CSV de prueba listo para el API
+(cabeceras `identificador;clase;cu;canton`, punto y coma) muestreando
+vehículos reales de `data/episodes/episode_vehicles.parquet` y construyendo la
+flota con `src.loading.scenarios.make_fleet`, el mismo código del conjunto de
+extrapolación:
+
+```bash
+# Un episodio real (año-semana-cantón) con 8 vehículos y una flota de 6
+# camiones, con la misma capacidad total que una flota de 4 (extrapolación)
+fleet_loading/.venv/bin/python scripts/sample_manifest.py \
+    --vehicles 8 --trucks 6 --cap-mode constant-total
+
+# Una semana grande (300 vehículos) con 10 camiones, guardado a archivo
+fleet_loading/.venv/bin/python scripts/sample_manifest.py \
+    --vehicles 300 --trucks 10 --out data/examples/manifiesto_10.csv
+```
+
+* `--vehicles 5..20` es **un episodio real completo** (una semana y un cantón
+  del SRI, submuestreado a 5-20 por el generador de escenarios); por debajo
+  del piso no existen episodios reales, y por encima el generador mezcla
+  varios episodios (una semana real en los archivos limpios tiene cientos de
+  vehículos).
+* `--trucks` acepta **cualquier** número: hasta 4 replica el rango de
+  entrenamiento; más allá es extrapolación (`same` = misma distribución de
+  capacidad, `constant-total` = mismo espacio total repartido entre más
+  camiones). Con más de 4 camiones solo los modelos pairwise lo sirven.
+* Cada corrida anota su procedencia (semillas, episodios, cantones y flota) en
+  un `.provenance.json` junto al CSV, o por stderr si se imprime a stdout —
+  para que un manifiesto de prueba sea reproducible.

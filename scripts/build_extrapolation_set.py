@@ -32,32 +32,15 @@ sys.path.insert(0, str(REPO_ROOT))
 import pandas as pd  # noqa: E402
 
 from src.loading.labeler import Vehicle, assign_vehicles  # noqa: E402
-from src.loading.scenarios import CAP_RANGE, N_TRUCKS_RANGE  # noqa: E402
+from src.loading.scenarios import make_fleet  # noqa: E402
 
 DEFAULT_EPISODES_DIR = REPO_ROOT / "data" / "episodes"
-TRAIN_MAX_TRUCKS = N_TRUCKS_RANGE[1]
 
 
 def extrapolation_seed(episode_id: str, n_trucks: int) -> int:
     """Semilla estable e independiente de PYTHONHASHSEED, como en scenarios.py."""
     key = f"extrapolation:{episode_id}:{n_trucks}"
     return int(hashlib.md5(key.encode("utf-8")).hexdigest()[:8], 16)
-
-
-def make_fleet(rng: random.Random, n_trucks: int, cap_mode: str) -> list[float]:
-    """`same`: idéntica distribución de capacidad que el entrenamiento; la
-    capacidad total crece con `n`, así que el aumento de camiones es la única
-    variable nueva.
-
-    `constant-total`: la capacidad total se mantiene en la banda que el modelo
-    vio (la de una flota de 4), repartida entre más camiones. Es el escenario
-    difícil: más contenedores para el mismo espacio.
-    """
-    low, high = CAP_RANGE
-    if cap_mode == "constant-total":
-        factor = TRAIN_MAX_TRUCKS / n_trucks
-        low, high = low * factor, high * factor
-    return [round(rng.uniform(low, high), 2) for _ in range(n_trucks)]
 
 
 def main() -> None:

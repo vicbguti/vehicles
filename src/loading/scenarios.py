@@ -36,6 +36,7 @@ from src.loading.labeler import Vehicle, assign_vehicles
 FLOOR_N = 5  # below this, see module docstring -- decided in conversation
 MAX_N = 20  # labeler's practical per-episode budget (see 06_feasibility.md)
 N_TRUCKS_RANGE = (1, 4)
+TRAIN_MAX_TRUCKS = N_TRUCKS_RANGE[1]  # 4: el mayor número de camiones que ve el entrenamiento
 CAP_RANGE = (3.0, 9.0)
 
 
@@ -91,6 +92,24 @@ def generate_fleet(rng: random.Random) -> list[float]:
     # Sorting consumes no randomness, so every other episode field is unchanged.
     # See docs/modelo/canonicalizacion.md sections 2 and 6.
     return sorted(caps)
+
+
+def make_fleet(rng: random.Random, n_trucks: int, cap_mode: str) -> list[float]:
+    """Flota sintética para un número ARBITRARIO de camiones (extrapolación).
+
+    ``same``: idéntica distribución de capacidad que el entrenamiento; la
+    capacidad total crece con ``n_trucks``, así que el aumento de camiones es
+    la única variable nueva.
+
+    ``constant-total``: la capacidad total se mantiene en la banda que el
+    modelo vio (la de una flota de ``TRAIN_MAX_TRUCKS``), repartida entre más
+    camiones. Es el escenario difícil: más contenedores para el mismo espacio.
+    """
+    low, high = CAP_RANGE
+    if cap_mode == "constant-total":
+        factor = TRAIN_MAX_TRUCKS / n_trucks
+        low, high = low * factor, high * factor
+    return [round(rng.uniform(low, high), 2) for _ in range(n_trucks)]
 
 
 @dataclass
