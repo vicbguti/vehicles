@@ -203,7 +203,7 @@ De la planificación, y contrastado con el PDF actual:
 
 ## 8. Qué hay disponible para reutilizar
 
-Todo bajo `src/modeling/`, con 80 pruebas en `tests/modeling/` en ese momento (hoy el repositorio tiene **430**, incluidas 325 del maestro exacto):
+Todo bajo `src/modeling/`, con 80 pruebas en `tests/modeling/` en ese momento (hoy el repositorio tiene **447**, incluidas 325 del maestro exacto):
 
 | Módulo | Qué resuelve |
 |---|---|

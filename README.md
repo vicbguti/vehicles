@@ -93,9 +93,9 @@ just docs-build   # mkdocs build --strict: falla ante cualquier enlace roto
 just --list       # todas las recetas
 ```
 
-Lo mismo que verifica la CI. Las 440 pruebas incluyen 325 del maestro exacto,
-validadas por mutación —se comprobó que fallan ante regresiones deliberadas, no
-solo que pasan en verde.
+Lo mismo que verifica la CI. Las 447 pruebas incluyen 325 del maestro exacto y
+las del decodificador, todas validadas por mutación —se comprobó que fallan ante
+regresiones deliberadas, no solo que pasan en verde.
 
 La documentación pasa por `mkdocs build --strict` en CI, así que una referencia
 a un archivo que ya no existe rompe el build en vez de quedarse ahí.

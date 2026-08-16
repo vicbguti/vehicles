@@ -10,9 +10,28 @@ aislada es razonable y la suma es inválida. El softmax no conoce la restricció
 acoplada `sum(cu) <= capacidad`.
 
 El decoder recorre los vehículos en un orden, prueba los camiones en el orden de
-preferencia del modelo y asigna al primero que quepa. La invariante es dura: al
-salir, ningún camión excede su capacidad. Ésa es la garantía que el clasificador
-por sí solo no puede dar.
+preferencia del modelo y asigna al primero que quepa. Ésa es la garantía que el
+clasificador por sí solo no puede dar.
+
+Qué garantiza la salida
+-----------------------
+El plan es una **partición total del manifiesto**, y de ahí cuelgan tres cosas
+que el reporte afirma por escrito:
+
+1. **Capacidad.** Un vehículo se coloca sólo si cabe, y la capacidad restante se
+   descuenta en el acto. Al salir se afirma la invariante: si eso falla, ninguna
+   otra métrica importa.
+2. **Unicidad y totalidad.** `assignment` tiene un lugar por vehículo,
+   inicializado a `DEFERRED`; `_vehicle_order` devuelve una **permutación** de
+   los índices, así que cada vehículo se visita una vez, y el `break` cierra su
+   decisión. Ninguno queda sin resolver, ninguno recibe dos destinos.
+3. **Identidad.** El índice del arreglo *es* el vehículo: ninguno se duplica ni
+   se pierde, aunque comparta clase y CU con otro.
+
+Las tres están fijadas por `tests/modeling/test_capacity_decoder.py`, incluida la
+permutación -- que es la propiedad frágil: cambiar `_vehicle_order` por un filtro
+o por un `sorted` sobre un subconjunto rompería (2) y (3) en silencio, dejando
+planes factibles pero incompletos.
 
 Sobre el orden y el diferimiento voluntario
 -------------------------------------------

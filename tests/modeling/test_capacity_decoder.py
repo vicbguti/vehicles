@@ -1,4 +1,23 @@
-"""Decoder de capacidad. La invariante que importa: nunca excede la capacidad."""
+"""Decoder de capacidad y las tres garantías que el plan de salida debe cumplir.
+
+El decodificador promete tres cosas, y las tres se afirman por escrito en el
+reporte, así que las tres tienen que estar fijadas aquí:
+
+- **Capacidad.** Ningún camión excede su espacio. Es la invariante dura.
+- **Unicidad y totalidad.** Cada vehículo termina en exactamente un camión o
+  diferido: ninguno queda sin resolver, ninguno recibe dos destinos.
+- **Identidad.** El índice del arreglo *es* el vehículo; ninguno se duplica ni
+  se pierde.
+
+Las dos últimas se sostienen sobre un detalle fácil de romper sin querer: que
+`_vehicle_order` devuelva una **permutación** de los índices. Un `sorted` sobre
+un subconjunto, o un filtro, seguirían pasando todas las pruebas por caso
+concreto y dejarían el reporte afirmando algo falso. De ahí el barrido aleatorio
+y la prueba explícita de permutación.
+
+Las instancias aleatorias usan semilla fija: reproducibles, sin dependencias
+nuevas.
+"""
 
 from __future__ import annotations
 
@@ -8,15 +27,71 @@ import pytest
 from src.modeling.capacity_decoder import (
     DEFERRED,
     POLICIES,
+    _vehicle_order,
     decode_episode,
     greedy_first_fit_decreasing,
     split_logits,
 )
 
+# Los CU reales de config/vehicle_classes.yaml, más 2/3: no es representable en
+# decimal y es justo donde un decoder con la comparación mal puesta se rompe.
+_CU_POSIBLES = (0.2, 1.0, 1.1, 1.4, 2 / 3)
+
+# Cuántos episodios recorre cada barrido. Suficiente para cruzar flota vacía,
+# manifiesto vacío, capacidad de sobra y capacidad escasa en la misma prueba.
+_CASOS = 200
+
 
 def _logits(preferences: list[list[float]], defer: list[float]) -> np.ndarray:
     """Arma (V, 1+T) con el diferimiento en la columna 0."""
     return np.column_stack([np.array(defer, dtype=float), np.array(preferences, dtype=float)])
+
+
+def _episodio_aleatorio(rng: np.random.Generator) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Un episodio cualquiera dentro del dominio del decoder: `(logits, cu, capacities)`.
+
+    Incluye a propósito los bordes -- cero vehículos, cero camiones -- y alterna
+    flotas holgadas con flotas escasas, porque la coherencia entre el plan y las
+    cargas sólo es informativa cuando de verdad hay vehículos que no caben.
+    """
+    n_vehicles = int(rng.integers(0, 13))
+    n_trucks = int(rng.integers(0, 5))
+    cu = rng.choice(_CU_POSIBLES, size=n_vehicles)
+
+    # Holgada: entra casi todo. Escasa: hay que dejar vehículos fuera.
+    holgada = bool(rng.integers(0, 2))
+    total = cu.sum() if n_vehicles else 1.0
+    escala = (2.0 if holgada else 0.35) * total / max(n_trucks, 1)
+    capacities = np.round(rng.uniform(0.5 * escala, 1.5 * escala, size=n_trucks), 2)
+
+    # scale=5 hace que las preferencias sean fuertes y se contradigan entre sí:
+    # el modelo "insiste" en camiones que ya están llenos, que es el caso duro.
+    logits = rng.normal(scale=5.0, size=(n_vehicles, n_trucks + 1))
+    return logits, cu, capacities
+
+
+def _verificar_particion(decoded, cu: np.ndarray, n_trucks: int, pista: str) -> None:
+    """Las tres garantías del plan, sobre un episodio ya decodificado."""
+    assignment = decoded.assignment
+
+    # Totalidad: hay una decisión por vehículo, ni una más ni una menos.
+    assert len(assignment) == len(cu), pista
+    assert decoded.n_loaded + decoded.n_deferred == len(cu), pista
+
+    # Dominio: todo destino es un camión que existe, o el diferimiento.
+    assert set(assignment.tolist()) <= {DEFERRED, *range(n_trucks)}, pista
+
+    # Coherencia entre el plan publicado y las cargas reportadas. `truck_loads`
+    # se calcula como `capacities - remaining`, sin mirar `assignment`: si las
+    # dos mitades se separaran, esto es lo único que se daría cuenta.
+    for j in range(n_trucks):
+        esperado = cu[assignment == j].sum()
+        assert decoded.truck_loads[j] == pytest.approx(esperado), f"{pista}, camión {j}"
+
+    # Conservación: nada se carga sin salir del manifiesto.
+    assert decoded.cu_loaded == pytest.approx(cu[assignment != DEFERRED].sum()), pista
+
+    assert decoded.is_feasible, pista
 
 
 @pytest.mark.parametrize("policy", POLICIES)
@@ -151,3 +226,44 @@ def test_el_greedy_puede_ser_peor_que_el_optimo():
 def test_politica_desconocida_falla():
     with pytest.raises(ValueError, match="Política desconocida"):
         decode_episode(np.zeros((1, 2)), cu=[1.0], capacities=[6.0], policy="magia")
+
+
+@pytest.mark.parametrize("policy", POLICIES)
+def test_el_plan_es_una_particion_total_del_manifiesto(policy):
+    """Sobre episodios aleatorios: totalidad, dominio válido y coherencia entre
+    el plan y las cargas. Es la garantía que el reporte afirma por escrito."""
+    for caso in range(_CASOS):
+        rng = np.random.default_rng(20260815 + caso)
+        logits, cu, capacities = _episodio_aleatorio(rng)
+        decoded = decode_episode(logits, cu, capacities, policy=policy)
+        _verificar_particion(decoded, cu, len(capacities), f"política {policy}, caso {caso}")
+
+
+@pytest.mark.parametrize("policy", POLICIES)
+def test_el_orden_de_vehiculos_es_una_permutacion(policy):
+    """La propiedad de la que cuelgan la unicidad y la totalidad.
+
+    Si `_vehicle_order` dejara de recorrer todos los vehículos exactamente una
+    vez -- un filtro, un `sorted` sobre un subconjunto -- el decoder seguiría
+    devolviendo planes factibles, sólo que incompletos, y ninguna prueba por caso
+    concreto lo notaría.
+    """
+    for caso in range(_CASOS):
+        rng = np.random.default_rng(90000 + caso)
+        n_vehicles = int(rng.integers(0, 13))
+        cu = rng.choice(_CU_POSIBLES, size=n_vehicles)
+        margin = rng.normal(scale=5.0, size=n_vehicles)
+
+        orden = _vehicle_order(policy, cu, margin)
+
+        assert sorted(orden.tolist()) == list(range(n_vehicles)), f"política {policy}, caso {caso}"
+
+
+def test_el_greedy_tambien_produce_una_particion_total():
+    """La línea base construye su `DecodedEpisode` por la misma vía y comparte
+    el mismo punto ciego, así que responde por la misma invariante."""
+    for caso in range(_CASOS):
+        rng = np.random.default_rng(70000 + caso)
+        _, cu, capacities = _episodio_aleatorio(rng)
+        decoded = greedy_first_fit_decreasing(cu, capacities)
+        _verificar_particion(decoded, cu, len(capacities), f"caso {caso}")
