@@ -69,6 +69,16 @@ train-mlp:
 evaluate-mlp:
     uv run python scripts/evaluate_mlp.py
 
+# Conjuntos de prueba fuera del sobre de entrenamiento (1-4 camiones, 20 vehículos).
+# Dos ejes, uno por conjunto; ver docs/modelo/resultados.md sección 6.
+extrapolation-trucks n_trucks="5 6" mode="same":
+    uv run python scripts/build_extrapolation_set.py --n-trucks {{ n_trucks }} --cap-mode {{ mode }}
+
+# El eje que el recorte MAX_N=20 dejaba sin medir: el 51 % de los manifiestos
+# reales lo supera. Reconstruye desde las features, no desde los episodios.
+extrapolation-manifest max_n="40":
+    uv run python scripts/build_extrapolation_set.py --axis manifest --max-n {{ max_n }}
+
 # Los dos clásicos: flota rellenada a ancho fijo y búsqueda con Optuna.
 # Ver docs/modelo/modelos_clasicos.md.
 train-rf trials="50":
