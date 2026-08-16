@@ -80,12 +80,17 @@ Tabla generada por `scripts/report_model_table.py` a partir de los JSON medidos.
 
 Las fórmulas exactas están en [métricas operativas](metricas.md).
 
-### Extrapolación a flotas mayores
+### Extrapolación fuera del sobre de entrenamiento
 
-Los modelos se entrenan con 1-4 camiones. Evaluados sobre manifiestos
-re-etiquetados con flotas más grandes (`scripts/evaluate_fleet_loading.py`),
-donde `loaded_gap_mean` = media de (vehículos del maestro − vehículos del
-modelo):
+Cada episodio de entrenamiento cabe en un sobre estrecho: **1-4 camiones y hasta
+20 vehículos**. Salir de él se mide en dos ejes, un conjunto por eje
+(`scripts/build_extrapolation_set.py`).
+
+#### Eje 1 — más camiones
+
+Evaluados sobre manifiestos re-etiquetados con flotas más grandes
+(`scripts/evaluate_fleet_loading.py`), donde `loaded_gap_mean` = media de
+(vehículos del maestro − vehículos del modelo):
 
 | Conjunto (camiones, capacidad) | XGBoost | LightGBM | Transformer | Greedy |
 |---|---|---|---|---|
@@ -103,6 +108,21 @@ medirlo aquí es la forma de no olvidarlo.
 
 Agregados completos por modelo en
 `artifacts/fleet_loading/<modelo>/extrap_*_metrics.json`.
+
+#### Eje 2 — manifiestos mayores
+
+El tope de 20 vehículos por episodio no es un detalle de implementación: **el
+51 % de los grupos cantón-semana reales lo supera** (mediana 21, máximo 2.774), y
+el recorte descartó 1.916.093 vehículos. El eje se mide levantando ese tope sólo
+en el conjunto de prueba y reetiquetando con el maestro exacto:
+
+```bash
+just extrapolation-manifest 40      # data/episodes/extrap_maxn_40/
+```
+
+Los resultados por escalón, y hasta dónde el maestro sigue certificando
+optimalidad dentro de su presupuesto, están en
+[Resultados §6](modelo/resultados.md#6-generalizacion-fuera-del-sobre-de-entrenamiento).
 
 ## Puesta en marcha
 

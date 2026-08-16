@@ -7,8 +7,10 @@
 > tabla hoy no se puede construir).
 >
 > Toda cifra de este documento proviene de `artifacts/mlp/metrics.json`,
-> `artifacts/mlp/training_report.json`, `artifacts/mlp/label_ceilings.json` o
-> `artifacts/mlp/teacher_self_agreement.json`. No hay valores estimados ni proyectados.
+> `artifacts/mlp/training_report.json`, `artifacts/mlp/label_ceilings.json`,
+> `artifacts/mlp/teacher_self_agreement.json`, los `artifacts/mlp/metrics_extrap_*.json`
+> (§6) o las tablas de episodios bajo `data/episodes/` (coste del maestro, §6.2). No hay
+> valores estimados ni proyectados.
 
 > **Medido sobre el conjunto con la flota ordenada.** El 27 de julio se documentó que el
 > generador de escenarios devolvía las capacidades en orden aleatorio, que eso determinaba
@@ -306,13 +308,22 @@ la canonicalización**: recalculada sin canonicalizar da exactamente los mismos 
 
 ---
 
-## 6. Generalización a flotas mayores que las vistas
+## 6. Generalización fuera del sobre de entrenamiento
+
+Cada episodio de entrenamiento cabe en un sobre estrecho: **1–4 camiones y hasta 20
+vehículos** (`src/loading/scenarios.py`). Salir de ese sobre se mide en dos ejes, un
+conjunto por eje, y en los dos el procedimiento es el mismo: cambiar **una sola variable**
+y reetiquetar con el etiquetador exacto (`scripts/build_extrapolation_set.py`).
+
+Los dos ejes dan respuestas distintas, y conviene no promediarlas: en el de camiones el
+modelo deja de reproducir al maestro, y en el de manifiestos no.
+
+### 6.1 Eje de camiones
 
 Los datos de entrenamiento contienen entre uno y cuatro camiones. Como el perceptrón se
 comparte entre todos los pares, **los mismos pesos** pueden puntuar manifiestos con más
 camiones sin reconstruir ni reentrenar la red. Para comprobarlo se tomaron los mismos
-manifiestos de prueba, se les cambió únicamente la flota y se reetiquetaron con el
-etiquetador exacto (`scripts/build_extrapolation_set.py`):
+manifiestos de prueba, se les cambió únicamente la flota y se reetiquetaron:
 
 | Conjunto | Camiones | Violaciones | Brecha de conteo | Iguala el óptimo | Greedy |
 |---|---|---:|---:|---:|---:|
@@ -342,6 +353,76 @@ factibles y de buen conteo, pero **deja de reproducir el reparto del etiquetador
 la flota excede lo que vio. La extrapolación es, por tanto, una propiedad *arquitectónica*
 demostrada —la red acepta flotas arbitrarias— y no una garantía de calidad.
 
+### 6.2 Eje de tamaño de manifiesto
+
+El otro tope del sobre es `MAX_N = 20`, el submuestreo por episodio. No es un detalle de
+implementación: **el 51,0 % de los grupos cantón-semana reales lo supera** (mediana 21, p99
+1.097, máximo 2.774), y el recorte descartó **1.916.093 vehículos**. Dicho de otro modo, la
+mitad de los manifiestos que el sistema vería en operación son mayores que cualquiera que el
+modelo haya visto.
+
+El conjunto se construye levantando ese tope **sólo en el año de prueba** —el entrenamiento
+no se toca— y reetiquetando con el maestro. Cada escalón es el mismo conjunto de 1.531
+episodios de 2026 con más vehículos por manifiesto:
+
+| Conjunto | Veh./ep. | Violaciones | Brecha de conteo | Iguala el óptimo | Concordancia | Greedy |
+|---|---:|---:|---:|---:|---:|---:|
+| Prueba 2026 (`MAX_N` = 20) | 15,3 | 0,0000 | +0,0242 | 97,58 % | 0,9293 | +0,5990 |
+| Extrapolación, `max_n` = 25 | 18,6 | 0,0000 | +0,0438 | 96,21 % | 0,9218 | +0,9915 |
+| Extrapolación, `max_n` = 30 | 21,0 | 0,0000 | +0,0621 | 94,71 % | 0,9142 | +1,4363 |
+| Extrapolación, `max_n` = 40 | 25,3 | 0,0000 | +0,0885 | 93,12 % | 0,9164 | +2,2949 |
+| Extrapolación, `max_n` = 50 | 29,0 | 0,0000 | +0,1021 | 92,98 % | 0,9224 | +2,9337 |
+
+**Este eje sí discrimina, y el resultado es el contrario al anterior.** Tres lecturas:
+
+1. **La factibilidad aguanta entera.** Cero violaciones de capacidad en los cinco conjuntos,
+   incluidos manifiestos de 50 vehículos. No es mérito del clasificador sino del
+   decodificador, que garantiza la partición por construcción (§ el módulo
+   `capacity_decoder.py` y sus pruebas), y es justo lo que hace que la extrapolación sea
+   segura de intentar.
+2. **La degradación es suave, y la del greedy no.** La brecha del modelo se multiplica por
+   4,2 (de +0,024 a +0,102) mientras la del greedy se multiplica por 4,9 partiendo de un
+   valor 25 veces mayor: a 50 vehículos el greedy deja **29 veces** más vehículos sin cargar
+   que el modelo. La ventaja sobre la heurística no se erosiona al crecer el manifiesto —
+   **se ensancha**.
+3. **La concordancia por clase no se desploma.** Se mantiene entre 0,914 y 0,922 en los
+   cuatro escalones, frente al 0,9293 dentro del sobre. Es el contraste que importa con
+   §6.1: al añadir camiones el modelo dejaba de reproducir el reparto del maestro (0,11),
+   mientras que al añadir vehículos lo sigue reproduciendo. Tiene sentido —el eje de
+   camiones cambia el espacio de etiquetas, y el de vehículos no— pero era una hipótesis
+   hasta medirla.
+
+Estos conjuntos son además los **exigentes** que el §8 pedía: la proporción de vehículos
+diferidos sube del 4,13 % al 15,18 % al pasar de 20 a 50, porque el manifiesto crece contra
+una flota que no cambia. El déficit de capacidad aparece solo, sin forzarlo.
+
+#### Hasta dónde llega el maestro
+
+El conjunto sólo sirve mientras exista un óptimo **certificado** contra el que medir: el
+etiquetador devuelve `optimal=False` si agota su presupuesto de 5 s, y
+`dataset.drop_non_optimal` descarta esos episodios. Cuántos se pierden es, en sí mismo, un
+resultado:
+
+| `max_n` | Certifica | Sin certificar | Búsqueda media | p99 |
+|---:|---:|---:|---:|---:|
+| 20 | 100,00 % | 0 | 6,4 ms | 114,9 ms |
+| 25 | 100,00 % | 0 | 31,4 ms | 577,7 ms |
+| 30 | 100,00 % | 0 | 58,4 ms | 1.168,8 ms |
+| 40 | 99,67 % | 5 | 132,7 ms | 3.391,2 ms |
+| 50 | 98,56 % | 22 | 199,7 ms | 5.002,6 ms |
+
+El maestro llega **bastante más lejos de lo que el tope de 20 sugería**: certifica todos los
+episodios hasta 30 vehículos y todavía el 99,67 % a 40. El motivo es estructural —la
+búsqueda es un programa dinámico memoizado sobre `(camión, conteos restantes por clase)`, así
+que el coste crece polinómicamente con el número de vehículos y exponencialmente con el de
+**clases**, que aquí son cuatro y fijas. Los episodios que se rinden son homogéneos: los 5 de
+`max_n` = 40 son todos manifiestos de exactamente 40 vehículos con 3 o 4 camiones.
+
+Queda un eje sin medir, el de **número de clases**, que por lo anterior es el que más
+encarece la búsqueda exacta. No se construyó porque las seis clases fuera de alcance de
+`config/vehicle_classes.yaml` no tienen CU asignado, y asignárselo cambiaría el alcance del
+problema en lugar de sólo el conjunto de prueba.
+
 ---
 
 ## 7. Conclusiones
@@ -355,11 +436,16 @@ demostrada —la red acepta flotas arbitrarias— y no una garantía de calidad.
    nulos lo cuantifica en las dos dimensiones: sin el modelo, la brecha de conteo se
    multiplica por diez y la concordancia por clase cae de 0,9293 a 0,3092. Reproduce el plan
    completo del etiquetador en el 76,75 % de los episodios.
-4. **La arquitectura por pares cumple el requisito de flota sin límite codificado**, y se
-   verificó ejecutando el modelo entrenado sobre manifiestos de diez camiones sin reentrenar
-   ni reconstruir la red. Es una propiedad arquitectónica demostrada, **no una garantía de
-   calidad**: fuera del rango entrenado la concordancia por clase se desploma y, en el único
-   conjunto de extrapolación exigente, el greedy queda ligeramente por delante (§6).
+4. **La generalización fuera del sobre depende del eje, y hay que decirlo separado (§6).**
+   En el de **camiones**, la arquitectura por pares cumple el requisito de flota sin límite
+   codificado —se verificó sobre manifiestos de diez camiones sin reentrenar—, pero es una
+   propiedad arquitectónica, **no una garantía de calidad**: la concordancia por clase se
+   desploma a 0,11 y en el único conjunto exigente el greedy queda ligeramente por delante.
+   En el de **tamaño de manifiesto** el resultado es el opuesto y es el que responde a la
+   pregunta operativa: con manifiestos de hasta 50 vehículos —el 51 % de los reales supera
+   los 20 que vio el modelo— la concordancia se mantiene en 0,92, la brecha se degrada
+   suavemente (+0,024 → +0,102) y la ventaja sobre el greedy **se ensancha** hasta 29×. Cero
+   violaciones de capacidad en los dos ejes.
 5. **La baja exactitud que se observaba era una propiedad del generador de datos, y se
    corrigió.** El orden aleatorio de la flota cambiaba el plan del etiquetador sin ser una
    entrada observable. Ordenándola, el mismo modelo con los mismos hiper-parámetros pasa de
@@ -382,6 +468,8 @@ demostrada —la red acepta flotas arbitrarias— y no una garantía de calidad.
 - **Reentrenar los otros cuatro modelos** sobre el conjunto regenerado y consolidarlos en la
   tabla de la sección VII. Requiere antes unificar partición, métricas y convención de
   etiqueta — ver [`08_comparabilidad_cinco_modelos.md`](../decisiones/03_comparabilidad.md).
-- **Construir conjuntos de extrapolación exigentes**, con déficit de capacidad forzado, para
-  que la prueba de flotas grandes discrimine.
+- **Cerrar el tercer eje de extrapolación: el número de clases.** Los de camiones y tamaño de
+  manifiesto ya están medidos (§6); el de clases es el que más encarece la búsqueda exacta y
+  el único que sigue sin evidencia. Requiere antes decidir qué CU se asigna a las seis clases
+  hoy fuera de alcance, que es una decisión de alcance del problema, no de evaluación.
 - **Ablación de `canton`**, hoy excluido por no participar en la restricción de capacidad.
