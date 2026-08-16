@@ -38,9 +38,10 @@ sección `sin_camion` con los que el modelo difiere por falta de espacio.
 
 ## Qué modelo responde
 
-Se sirven los tres modelos *pairwise* (XGBoost, LightGBM y el transformer de
-atención). El modelo en uso se elige **al arrancar** con la variable de
-entorno `FLEET_LOADING_MODEL`; sin ella, el valor por defecto es `xgboost`:
+Se sirven los tres modelos *pairwise* del pipeline Kedro (XGBoost, LightGBM y
+el transformer de atención). El modelo en uso se elige **al arrancar** con la
+variable de entorno `FLEET_LOADING_MODEL`; sin ella, el valor por defecto es
+`xgboost`:
 
 ```bash
 FLEET_LOADING_MODEL=attention fleet_loading/.venv/bin/python \
@@ -64,6 +65,16 @@ La política de decodificación no se configura: se lee la registrada en los
 resultados medidos de cada modelo (`artifacts/fleet_loading/results/*.json`)
 y, si no existe, se usa `count` — el objetivo primario del caso de uso es
 maximizar cuántos vehículos se transportan.
+
+### Los otros modelos y por qué no se sirven
+
+El repositorio entrena seis. Los otros tres quedan fuera por razones distintas:
+
+| Modelo | Formulación | ¿Por qué no se sirve? |
+|---|---|---|
+| MLP (Keras) | *pairwise* | Es pairwise y serviría igual, pero requiere TensorFlow/Keras, que la API no carga (el entorno de servicio es el de `fleet_loading`). Su artefacto además vive en `artifacts/mlp/` con otro formato (`feature_schema.json` + `.keras`) que `ModelService` no lee. Es el candidato natural si algún día se quiere servir |
+| Random Forest | ancho fijo | Clasificador multiclase con la flota rellenada a `max_trucks`; no generaliza por encima del rango de entrenamiento. Y su artefacto ni siquiera guarda el modelo (`artifacts/rf/` solo tiene el esquema y el reporte) |
+| Regresión logística | ancho fijo | Igual que el RF: la flota rellenada a `max_trucks` le pone un tope duro que este servicio no aplica |
 
 ## Sin límite de camiones ni de capacidad
 

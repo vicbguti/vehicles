@@ -11,6 +11,11 @@ manifiesto.
 Los tres modelos servidos (XGBoost, LightGBM y attention) son *pairwise*: el
 eje de camiones es dinámico, así que **no hay límite de camiones ni de
 capacidad**. La única diferencia entre ellos es cómo se cargan los logits.
+
+Los otros tres del repositorio quedan fuera: el MLP es pairwise pero exige
+TensorFlow/Keras y vive en `artifacts/mlp/` con otro formato de artefacto; RF
+y regresión logística son de ancho fijo (flota rellenada a ``max_trucks``),
+con lo que no generalizan por encima del rango de entrenamiento.
 """
 
 from __future__ import annotations
