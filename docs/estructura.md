@@ -53,8 +53,23 @@ attention y el MLP) sin límite de camiones ni de capacidad, y los de ancho fijo
 (Random Forest y regresión logística) con el tope `max_trucks` de su artefacto
 aplicado explícitamente. Valida el manifiesto con los motivos del caso de uso y
 genera el plan con `decode_episode`, reutilizando `src.modeling`. El modelo en
-uso se elige al arrancar con `FLEET_LOADING_MODEL`. Detalle en
-[servicio de distribución (API)](api.md).
+uso se elige al arrancar con `FLEET_LOADING_MODEL`. Se sirve con `just api`.
+Detalle en [servicio de distribución (API)](api.md).
+
+## `web/` — la interfaz (React + Vite)
+
+Aplicación web que sube el manifiesto y la flota, pide el plan a `src/api` y
+muestra la distribución por camión (y los diferidos). El dev server proxya
+`/api` a `http://127.0.0.1:8000`, así que arranca en paralelo con la API:
+
+```bash
+just api      # terminal 1: el servicio
+just web-dev  # terminal 2: la interfaz en http://127.0.0.1:5173
+```
+
+La puerta de calidad es `just web-check` (lint y build), que `just check`
+incluye igual que CI. Es un proyecto npm independiente (`web/package.json`):
+`just setup` instala sus dependencias junto con las de Python.
 
 ## `scripts/` — entradas de línea de comandos
 

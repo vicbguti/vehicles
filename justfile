@@ -15,6 +15,7 @@ setup:
     git lfs install --local
     git lfs pull
     uv run pre-commit install
+    cd web && npm install
 
 # --- puertas de calidad ---------------------------------------------------
 
@@ -34,7 +35,31 @@ cov:
     uv run pytest --cov --cov-report=term-missing
 
 # Todo lo que CI verifica, en un solo comando.
-check: lint format-check test
+check: lint format-check web-check test
+
+# --- frontend y API -------------------------------------------------------
+
+# El servicio de distribución (FastAPI) en http://127.0.0.1:8000. Usa el mismo
+# entorno de la raíz que el resto del repo (uv), con los extras que necesitan
+# los modelos pairwise (xgboost, lightgbm) y el attention (torch); keras y
+# tensorflow ya están en las dependencias base. El primer arranque sincroniza
+# esos extras; después es inmediato. El modelo en uso se elige con
+# FLEET_LOADING_MODEL (ver docs/api.md); por defecto, xgboost.
+api:
+    uv run --extra gbt --extra attention -m uvicorn src.api.main:app --port 8000
+
+# La interfaz es un proyecto npm independiente en web/. El dev server proxy
+# /api a la API (8000), así que arranca en paralelo con `just api`.
+web-dev:
+    cd web && npm run dev
+
+web-lint:
+    cd web && npm run lint
+
+web-build:
+    cd web && npm run build
+
+web-check: web-lint web-build
 
 # --- documentación --------------------------------------------------------
 

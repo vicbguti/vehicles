@@ -12,7 +12,7 @@ La API reutiliza la maquinaria del repositorio (`src.modeling` y
 modelos:
 
 ```bash
-fleet_loading/.venv/bin/python -m uvicorn src.api.main:app --port 8000
+just api
 ```
 
 Se sirve en `http://127.0.0.1:8000`. La documentación interactiva de los
@@ -74,8 +74,7 @@ arrancar** con la variable de entorno `FLEET_LOADING_MODEL`; sin ella, el valor
 por defecto es `xgboost`:
 
 ```bash
-FLEET_LOADING_MODEL=mlp fleet_loading/.venv/bin/python \
-    -m uvicorn src.api.main:app --port 8000
+FLEET_LOADING_MODEL=mlp just api
 ```
 
 Los nombres válidos son `xgboost`, `lightgbm`, `attention` (en

@@ -41,7 +41,8 @@ head -c 40 data/clean/SRI_Vehiculos_Nuevos_2025.csv   # no debe decir "version h
 ```
 
 Con [`just`](https://github.com/casey/just) instalado, `just setup` hace todo lo
-anterior y además activa los hooks de pre-commit.
+anterior, activa los hooks de pre-commit e instala las dependencias de la
+interfaz web (`web/`). Eso requiere además [Node.js](https://nodejs.org) 22+.
 
 ## Servicio de distribución (API)
 
@@ -52,8 +53,7 @@ regresión logística) con el tope `max_trucks` de su artefacto aplicado
 explícitamente por el servicio:
 
 ```bash
-FLEET_LOADING_MODEL=mlp fleet_loading/.venv/bin/python \
-    -m uvicorn src.api.main:app --port 8000
+FLEET_LOADING_MODEL=mlp just api
 ```
 
 `FLEET_LOADING_MODEL` elige el modelo al arrancar (`xgboost` | `lightgbm` |
@@ -63,6 +63,9 @@ backend de torch si no hay TensorFlow). Endpoints: `POST /api/manifest`
 (valida el CSV y la flota) y
 `POST /api/distribute` (genera el plan, y devuelve con qué modelo y en cuántos
 milisegundos). Detalle en [`docs/api.md`](./docs/api.md).
+
+La interfaz web se sirve aparte con `just web-dev` (proxya `/api` a la API en
+`http://127.0.0.1:8000`), así que ambos arrancan en paralelo.
 
 ## Uso
 
@@ -99,7 +102,9 @@ el transformer se entrena en CPU y las ruedas de CUDA son varios GB inútiles.
 ## Desarrollo
 
 ```bash
-just check        # ruff check + ruff format --check + pytest
+just check        # ruff check + ruff format --check + lint/build web + pytest
+just api          # el servicio de distribución en http://127.0.0.1:8000
+just web-dev      # la interfaz web en http://127.0.0.1:5173
 just docs         # sitio MkDocs en local (http://127.0.0.1:8001)
 just docs-build   # mkdocs build --strict: falla ante cualquier enlace roto
 just --list       # todas las recetas
@@ -120,6 +125,7 @@ a un archivo que ya no existe rompe el build en vez de quedarse ahí.
 | `src/modeling/` | Núcleo compartido: canonicalización, tensores por par, decoder con capacidad, métricas y el protocolo de partición |
 | `src/pipeline/`, `src/profiler/` | Ingesta, limpieza y perfilado del dataset del SRI |
 | `fleet_loading/` | Pipeline Kedro de los modelos XGBoost, LightGBM y transformer |
+| `web/` | La interfaz React + Vite (`just web-dev`, `just web-check`) |
 | `scripts/` | Entradas de línea de comandos |
 | `config/` | Clases de vehículo, hiperparámetros del MLP y rutas del perfilado |
 | `docs/` | Sitio MkDocs |
