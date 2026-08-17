@@ -1,9 +1,10 @@
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router-dom"
-import { ArrowLeft, Truck } from "lucide-react"
+import { ArrowLeft, Download, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import type { DistributionPlan, Truck as TruckPlan } from "@/lib/types"
+import { distributionToCsv, downloadText } from "@/lib/csv"
 import { TruckSection } from "./TruckSection"
 import { DistributionTable } from "./DistributionTable"
 import { PlanSummary } from "./PlanSummary"
@@ -18,6 +19,11 @@ export function DistributionPage() {
 
   const handleRemoveTruck = (id: string) =>
     setTrucks((prev) => (prev ? prev.filter((t) => t.id !== id) : prev))
+
+  const handleDownload = () => {
+    if (!trucks) return
+    downloadText("distribucion.csv", distributionToCsv(trucks, sinCamion))
+  }
 
   if (!trucks) {
     return (
@@ -60,10 +66,18 @@ export function DistributionPage() {
           <ArrowLeft />
           Volver al manifiesto
         </Button>
-        <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-          Plan de
-        </p>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">Distribución</h1>
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+              Plan de
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Distribución</h1>
+          </div>
+          <Button variant="outline" onClick={handleDownload}>
+            <Download />
+            Descargar CSV
+          </Button>
+        </div>
       </header>
 
       {plan && <PlanSummary plan={{ ...plan, trucks }} />}
