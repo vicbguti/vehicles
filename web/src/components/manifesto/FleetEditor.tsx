@@ -1,5 +1,6 @@
 import { useState } from "react"
 import { Plus, X } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -8,14 +9,46 @@ interface FleetEditorProps {
   onChange: (capacities: number[]) => void
 }
 
+const PRESETS: { label: string; capacities: number[] }[] = [
+  { label: "Profesor (6,6)", capacities: [6, 6] },
+  { label: "Profesor-escalado (6,7,7)", capacities: [6, 7, 7] },
+]
+
 export function FleetEditor({ capacities, onChange }: FleetEditorProps) {
   const [newCapacity, setNewCapacity] = useState("")
+  const [bulkText, setBulkText] = useState(capacities.join(", "))
+  const [bulkError, setBulkError] = useState<string | null>(null)
 
   const handleAdd = () => {
     const value = parseFloat(newCapacity)
     if (!Number.isFinite(value) || value <= 0) return
     onChange([...capacities, value])
     setNewCapacity("")
+  }
+
+  const parseBulk = (text: string): number[] | null => {
+    const parsed = text
+      .split(",")
+      .map((part) => parseFloat(part.trim()))
+      .filter((value) => Number.isFinite(value))
+    if (parsed.length === 0 || parsed.some((value) => value <= 0)) return null
+    return parsed
+  }
+
+  const applyBulk = () => {
+    const parsed = parseBulk(bulkText)
+    if (parsed === null) {
+      setBulkError("Escribe capacidades separadas por coma, todas mayores a 0 (p. ej. 6,6).")
+      return
+    }
+    setBulkError(null)
+    onChange(parsed)
+  }
+
+  const applyPreset = (preset: { label: string; capacities: number[] }) => {
+    setBulkError(null)
+    setBulkText(preset.capacities.join(", "))
+    onChange(preset.capacities)
   }
 
   return (
@@ -25,6 +58,46 @@ export function FleetEditor({ capacities, onChange }: FleetEditorProps) {
         <p className="mt-1 text-xs text-muted-foreground">
           Define la flota disponible. No hay límite de camiones ni de capacidad.
         </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {PRESETS.map((preset) => (
+          <Badge
+            key={preset.label}
+            variant="outline"
+            className="cursor-pointer"
+            onClick={() => applyPreset(preset)}
+          >
+            {preset.label}
+          </Badge>
+        ))}
+      </div>
+
+      <div className="flex items-end gap-2">
+        <div className="flex-1">
+          <label
+            htmlFor="flota-csv"
+            className="mb-1 block text-xs font-medium text-muted-foreground"
+          >
+            Capacidades separadas por coma (como el CSV)
+          </label>
+          <Input
+            id="flota-csv"
+            value={bulkText}
+            onChange={(e) => {
+              setBulkText(e.target.value)
+              setBulkError(null)
+            }}
+            onKeyDown={(e) => e.key === "Enter" && applyBulk()}
+            placeholder="6,6"
+          />
+          {bulkError && (
+            <p className="mt-1 text-xs text-destructive">{bulkError}</p>
+          )}
+        </div>
+        <Button variant="outline" onClick={applyBulk}>
+          Aplicar flota
+        </Button>
       </div>
 
       <div className="flex flex-col gap-2">
