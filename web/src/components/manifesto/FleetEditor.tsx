@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { Plus, X } from "lucide-react"
+import { ChevronDown, ChevronUp, Plus, X } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,10 +14,20 @@ const PRESETS: { label: string; capacities: number[] }[] = [
   { label: "Profesor-escalado (6,7,7)", capacities: [6, 7, 7] },
 ]
 
+// Por debajo de este número la lista se muestra entera; por encima, se pliega
+// a un resumen para no tapar la tabla de vehículos (un caso real puede traer
+// cientos de camiones).
+const MAX_VISIBLE_TRUCKS = 10
+
 export function FleetEditor({ capacities, onChange }: FleetEditorProps) {
   const [newCapacity, setNewCapacity] = useState("")
   const [bulkText, setBulkText] = useState(capacities.join(", "))
   const [bulkError, setBulkError] = useState<string | null>(null)
+  const [expanded, setExpanded] = useState(false)
+
+  const total = capacities.reduce((sum, capacity) => sum + capacity, 0)
+  const isLong = capacities.length > MAX_VISIBLE_TRUCKS
+  const showList = !isLong || expanded
 
   const handleAdd = () => {
     const value = parseFloat(newCapacity)
@@ -100,30 +110,56 @@ export function FleetEditor({ capacities, onChange }: FleetEditorProps) {
         </Button>
       </div>
 
-      <div className="flex flex-col gap-2">
-        {capacities.map((capacity, index) => (
-          <div
-            key={`${capacity}-${index}`}
-            className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-muted-foreground">
+          {capacities.length} camiones · capacidad total {total.toFixed(1)}
+        </span>
+        {isLong && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setExpanded((value) => !value)}
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
-            <span className="text-sm text-foreground">
-              Camión {index + 1}
-              <span className="ml-2 text-xs text-muted-foreground">
-                Capacidad Máxima: {capacity.toFixed(1)}
-              </span>
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onChange(capacities.filter((_, i) => i !== index))}
-              className="size-7 rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
-              aria-label={`Eliminar Camión ${index + 1}`}
-            >
-              <X />
-            </Button>
-          </div>
-        ))}
+            {expanded ? (
+              <>
+                <ChevronUp /> Ocultar lista
+              </>
+            ) : (
+              <>
+                <ChevronDown /> Ver lista completa
+              </>
+            )}
+          </Button>
+        )}
       </div>
+
+      {showList && (
+        <div className="flex flex-col gap-2">
+          {capacities.map((capacity, index) => (
+            <div
+              key={`${capacity}-${index}`}
+              className="flex items-center justify-between rounded-lg border border-border px-3 py-2"
+            >
+              <span className="text-sm text-foreground">
+                Camión {index + 1}
+                <span className="ml-2 text-xs text-muted-foreground">
+                  Capacidad Máxima: {capacity.toFixed(1)}
+                </span>
+              </span>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={() => onChange(capacities.filter((_, i) => i !== index))}
+                className="size-7 rounded-full bg-muted text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                aria-label={`Eliminar Camión ${index + 1}`}
+              >
+                <X />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex items-end gap-2">
         <div className="flex-1">

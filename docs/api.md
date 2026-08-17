@@ -150,6 +150,10 @@ curl http://127.0.0.1:8000/api/manifests/profesor-escalado.csv
 # Un caso-scenario real: todos los vehículos registrados en el cantón 21701
 # durante la semana 9 de 2026 (2,734 vehículos), sin cap de submuestreo
 curl http://127.0.0.1:8000/api/manifests/real-episode.csv
+
+# El caso COMPLETO (vehículos + la flota que va con ellos), para la UI
+curl http://127.0.0.1:8000/api/scenarios/profesor
+curl http://127.0.0.1:8000/api/scenarios/real-episode
 ```
 
 * `real-episode.csv` es un **episodio real completo** del SRI: el registro
@@ -159,6 +163,15 @@ curl http://127.0.0.1:8000/api/manifests/real-episode.csv
   con `?iso_year=&iso_week=&canton=`; por defecto sirve el cantón 21701,
   semana 9 de 2026 (2,734 vehículos). Los episodios reales van de 1 a 2,774
   vehículos, así que este es el caso de estrés real del problema.
+* `scenarios/{nombre}` devuelve el caso **completo** en JSON: los vehículos
+  reales (`csv_url` + `vehicles_count`) y la **flota** que va con ellos. Para
+  los ejemplos del enunciado la flota es la declarada (`[6, 6]` /
+  `[6, 7, 7]`); para `real-episode` el SRI no publica la flota de transporte
+  (es decisión del operador), así que se construye con la misma convención del
+  entrenamiento (cada camión transporta 3-9 CU) pero **dimensionada al
+  episodio**: el total cubre el 95% del CU real del episodio, determinista por
+  episodio. El caso por defecto (2,734 vehículos, 2,572 CU) lleva una flota de
+  ~407 camiones. La UI carga vehículos y flota juntos.
 
 * El preset `profesor` reproduce la forma del ejemplo de intratabilidad del
   enunciado (18 vehículos, 2 clases, 2 camiones de 6): Sedán -> AUTOMOVIL y

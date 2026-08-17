@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom"
 import { FolderUp, Truck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { ActiveModelBadge } from "@/components/ActiveModelBadge"
-import { ApiError, distributeVehicles, validateManifest } from "@/lib/api"
+import { ApiError, distributeVehicles, getManifestCsv, getScenario, validateManifest } from "@/lib/api"
 import type { Vehicle } from "@/lib/types"
+import { ExampleScenarios } from "./ExampleScenarios"
 import { FleetEditor } from "./FleetEditor"
 import { UploadManifestoDialog } from "./UploadManifestoDialog"
 import { VehicleTable } from "./VehicleTable"
@@ -20,6 +21,8 @@ export function ManifestoPage() {
   const [dialogError, setDialogError] = useState<string | null>(null)
   const [distributing, setDistributing] = useState(false)
   const [distributeError, setDistributeError] = useState<string | null>(null)
+  const [scenarioLoading, setScenarioLoading] = useState<string | null>(null)
+  const [scenarioError, setScenarioError] = useState<string | null>(null)
 
   const acceptedCount = vehicles.filter((v) => v.status === "accepted").length
 
@@ -35,6 +38,23 @@ export function ManifestoPage() {
       setDialogError(error instanceof ApiError ? error.message : "No se pudo procesar el archivo")
     } finally {
       setUploading(false)
+    }
+  }
+
+  const loadScenario = async (name: string) => {
+    setScenarioLoading(name)
+    setScenarioError(null)
+    try {
+      // El caso completo trae los vehículos y la flota que va con ellos.
+      const scenario = await getScenario(name)
+      setFleet(scenario.fleet)
+      const csv = await getManifestCsv(scenario.csvUrl)
+      const validated = await validateManifest(csv, scenario.fleet)
+      setVehicles(validated)
+    } catch (error) {
+      setScenarioError(error instanceof ApiError ? error.message : "No se pudo cargar el caso")
+    } finally {
+      setScenarioLoading(null)
     }
   }
 
@@ -87,6 +107,17 @@ export function ManifestoPage() {
       {distributeError && (
         <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
           {distributeError}
+        </p>
+      )}
+
+      <ExampleScenarios
+        disabled={uploading || distributing}
+        loadingName={scenarioLoading}
+        onLoad={loadScenario}
+      />
+      {scenarioError && (
+        <p className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {scenarioError}
         </p>
       )}
 

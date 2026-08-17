@@ -32,3 +32,15 @@ export interface Health {
   status: string
   model: string
 }
+
+/** Un caso completo servido por el API: los vehículos reales y la flota que
+ *  va con ellos, para que la UI los cargue juntos. */
+export interface Scenario {
+  name: string
+  fleet: number[]
+  vehiclesCount: number
+  csvUrl: string
+  isoYear?: number
+  isoWeek?: number
+  canton?: string
+}

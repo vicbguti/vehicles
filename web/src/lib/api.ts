@@ -1,4 +1,4 @@
-import type { DistributionPlan, Health, Vehicle } from "@/lib/types"
+import type { DistributionPlan, Health, Scenario, Vehicle } from "@/lib/types"
 
 const BASE_URL = "/api"
 
@@ -45,6 +45,42 @@ function request<T>(path: string, body: unknown): Promise<T> {
  * arrancar el servidor, así que este valor sólo cambia si se reinicia. */
 export function getHealth(): Promise<Health> {
   return send<Health>("/health", { method: "GET" })
+}
+
+/** Un caso completo (vehículos reales + flota coherente) del API.
+ *  El servidor responde en snake_case; aquí se mapea a camelCase, como hace
+ *  ``distributeVehicles`` con ``sin_camion``/``elapsed_ms``. */
+export async function getScenario(name: string): Promise<Scenario> {
+  const payload = await send<{
+    name: string
+    fleet: number[]
+    vehicles_count: number
+    csv_url: string
+    iso_year?: number
+    iso_week?: number
+    canton?: string
+  }>(`/scenarios/${name}`, { method: "GET" })
+  return {
+    name: payload.name,
+    fleet: payload.fleet,
+    vehiclesCount: payload.vehicles_count,
+    csvUrl: payload.csv_url,
+    isoYear: payload.iso_year,
+    isoWeek: payload.iso_week,
+    canton: payload.canton,
+  }
+}
+
+/** El CSV del caso (``Scenario.csvUrl``), como texto para ``validateManifest``. */
+export async function getManifestCsv(csvUrl: string): Promise<string> {
+  let response: Response
+  try {
+    response = await fetch(csvUrl)
+  } catch {
+    throw new ApiError(OFFLINE_MESSAGE)
+  }
+  if (!response.ok) throw new ApiError(`Error ${response.status} al descargar el manifiesto`)
+  return response.text()
 }
 
 export async function validateManifest(csv: string, fleet: number[]): Promise<Vehicle[]> {

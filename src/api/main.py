@@ -9,6 +9,8 @@ Carga el servicio de modelos bajo demanda (lazy) y expone:
   vehículos reales del SRI, listo para ``POST /api/distribute``.
 * ``GET  /api/manifests/real-episode.csv`` -- caso-scenario real: todos los
   vehículos registrados en un (año, semana, cantón), sin cap de submuestreo.
+* ``GET  /api/scenarios/{nombre}`` -- caso completo: vehículos reales + la
+  flota coherente que va con ellos (la UI los carga juntos).
 * ``POST /api/manifest``      -- valida un manifiesto (CSV o lista) y devuelve
   el estado por vehículo contra la flota dada.
 * ``POST /api/distribute``    -- genera el plan de distribución con el modelo.
@@ -40,6 +42,10 @@ from src.api.examples import (
     EXAMPLES,
     build_example_csv,
     build_real_episode_csv,
+    example_count,
+    example_fleet,
+    real_episode_count,
+    real_episode_fleet,
 )
 from src.api.models import ModelService, ModelUnavailableError
 from src.api.schemas import (
@@ -115,6 +121,54 @@ def real_episode(
     if not csv:
         raise HTTPException(status_code=404, detail="El episodio no existe en el registro")
     return Response(content=csv, media_type="text/csv")
+
+
+@app.get("/api/scenarios/{name}")
+def scenario(
+    name: str,
+    iso_year: int | None = None,
+    iso_week: int | None = None,
+    canton: str | None = None,
+) -> dict:
+    """Un caso completo, listo para la UI: los vehículos reales y la flota
+    coherente que va con ellos, de modo que la UI cargue ambos juntos.
+
+    * ``profesor`` / ``profesor-escalado``: vehículos reales del SRI con la
+      flota declarada del enunciado (``[6, 6]`` / ``[6, 7, 7]``).
+    * ``real-episode``: un episodio real completo (vehículos sin cap) con la
+      flota dimensionada al CU real del episodio: cada camión en la banda del
+      entrenamiento (3-9 CU) y el total cubriendo el 95% del CU del episodio,
+      determinista por episodio. El SRI no publica la flota de transporte
+      --esa es decisión del operador--, así que esta es la flota que un
+      operador necesitaría para mover ese episodio.
+    """
+    if name in EXAMPLES:
+        return {
+            "name": name,
+            "fleet": example_fleet(name),
+            "vehicles_count": example_count(name),
+            "csv_url": f"/api/manifests/{name}.csv",
+        }
+    if name == "real-episode":
+        iso_year = iso_year if iso_year is not None else DEFAULT_REAL_EPISODE[0]
+        iso_week = iso_week if iso_week is not None else DEFAULT_REAL_EPISODE[1]
+        canton = canton if canton is not None else DEFAULT_REAL_EPISODE[2]
+        count = real_episode_count(iso_year, iso_week, canton)
+        if count == 0:
+            raise HTTPException(status_code=404, detail="El episodio no existe en el registro")
+        return {
+            "name": name,
+            "iso_year": iso_year,
+            "iso_week": iso_week,
+            "canton": canton,
+            "fleet": real_episode_fleet(iso_year, iso_week, canton),
+            "vehicles_count": count,
+            "csv_url": (
+                f"/api/manifests/real-episode.csv?iso_year={iso_year}&iso_week={iso_week}"
+                f"&canton={canton}"
+            ),
+        }
+    raise HTTPException(status_code=404, detail="Escenario desconocido")
 
 
 @app.get("/api/manifests/{name}.csv")

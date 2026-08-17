@@ -18,6 +18,8 @@ from src.api.examples import (
     EXAMPLES,
     build_example_csv,
     build_real_episode_csv,
+    real_episode_count,
+    real_episode_fleet,
 )
 from src.api.main import app
 from src.api.validation import parse_csv
@@ -106,3 +108,49 @@ def test_api_404_para_episodio_real_inexistente() -> None:
     client = TestClient(app)
     r = client.get("/api/manifests/real-episode.csv?iso_year=1990&iso_week=1&canton=99999")
     assert r.status_code == 404
+
+
+def test_flota_del_episodio_real_es_determinista_y_dimensionada() -> None:
+    """La flota del caso real se dimensiona al CU del episodio (no es la banda
+    de 1-4 camiones del entrenamiento, que es para episodios <= 20)."""
+    y, w, c = DEFAULT_REAL_EPISODE
+    fleet = real_episode_fleet(y, w, c)
+    assert fleet == real_episode_fleet(y, w, c)  # determinista por episodio
+    assert len(fleet) > 4  # un cantón completo necesita una flota proporcional
+    assert all(cap > 0 for cap in fleet)
+    total_cu = sum(v.cu for v in parse_csv(build_real_episode_csv(y, w, c)))
+    assert round(sum(fleet), 1) == round(total_cu * 0.95, 1)
+    assert real_episode_count(y, w, c) > 20
+
+
+def test_api_sirve_el_caso_completo() -> None:
+    client = TestClient(app)
+    profesor = client.get("/api/scenarios/profesor").json()
+    assert profesor["fleet"] == [6.0, 6.0]
+    assert profesor["vehicles_count"] == 18
+    assert client.get(profesor["csv_url"]).status_code == 200
+
+    real = client.get("/api/scenarios/real-episode").json()
+    assert real["fleet"]
+    assert real["vehicles_count"] > 20
+    assert client.get(real["csv_url"]).status_code == 200
+
+
+def test_api_404_para_escenario_desconocido() -> None:
+    client = TestClient(app)
+    assert client.get("/api/scenarios/inexistente").status_code == 404
+
+
+def test_parse_csv_con_formato_inconsistente_da_mensaje_claro(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un CSV que pandas no puede tokenizar debe fallar con un mensaje accionable,
+    no con el error crudo ('Error tokenizing data...')."""
+    from pandas.errors import ParserError
+
+    def _raisy(*_args, **_kwargs):
+        raise ParserError("C error: Expected 1 fields in line 4, saw 2")
+
+    monkeypatch.setattr("src.api.validation.pd.read_csv", _raisy)
+    with pytest.raises(ValueError, match="formato de columnas es inconsistente"):
+        parse_csv("identificador;clase;cu;canton\nA;AUTOMOVIL;1.0;21701\n")

@@ -17,6 +17,7 @@ from __future__ import annotations
 import io
 
 import pandas as pd
+from pandas.errors import ParserError
 
 from src.api.schemas import ManifestVehicleIn, VehicleOut
 
@@ -63,7 +64,14 @@ def parse_csv(csv_text: str) -> list[ManifestVehicleIn]:
     delim = ";"
     if "," in csv_text.splitlines()[0] and ";" not in csv_text.splitlines()[0]:
         delim = ","
-    df = pd.read_csv(io.StringIO(csv_text), sep=delim, dtype=str)
+    try:
+        df = pd.read_csv(io.StringIO(csv_text), sep=delim, dtype=str)
+    except ParserError as exc:
+        raise ValueError(
+            "El CSV no se pudo leer: el formato de columnas es inconsistente "
+            "(se espera una fila de cabecera y una columna por vehículo, "
+            "separadas por punto y coma)."
+        ) from exc
     mapping = _column_map(df.columns.tolist())
     missing = [f for f in ("identificador", "clase", "cu", "canton") if f not in mapping]
     if missing:
