@@ -132,34 +132,49 @@ admite **cualquier número de camiones y cualquier capacidad** sin reentrenar.
 RF y regresión logística son de ancho fijo: su tope real (`max_trucks`) es
 parte del artefacto y lo aplica el propio servicio.
 
-## Probar con manifiestos propios
+## Probar con manifiestos de ejemplo
 
-`scripts/sample_manifest.py` genera un CSV de prueba listo para el API
-(cabeceras `identificador;clase;cu;canton`, punto y coma) muestreando
-vehículos reales de `data/episodes/episode_vehicles.parquet` y construyendo la
-flota con `src.loading.scenarios.make_fleet`, el mismo código del conjunto de
-extrapolación:
+El input del app son CSV, y la propia app los sirve: `GET
+/api/manifests/{nombre}.csv` devuelve un manifiesto de ejemplo (cabeceras
+`identificador;clase;cu;canton`, punto y coma) construido **con vehículos
+reales del SRI** (registro `data/features/vehicles_in_scope.parquet`, 2.5 M de
+vehículos con su código real, cantón y CU), que es el objetivo del proyecto.
+El resultado se envía tal cual a `POST /api/distribute`.
 
 ```bash
-# Un episodio real (año-semana-cantón) con 8 vehículos y una flota de 6
-# camiones, con la misma capacidad total que una flota de 4 (extrapolación)
-fleet_loading/.venv/bin/python scripts/sample_manifest.py \
-    --vehicles 8 --trucks 6 --cap-mode constant-total
+# El ejemplo del profesor (18 vehículos, 2 camiones de 6 unidades) y su
+# escalado a 25 vehículos en 3 camiones (6, 7, 7)
+curl http://127.0.0.1:8000/api/manifests/profesor.csv
+curl http://127.0.0.1:8000/api/manifests/profesor-escalado.csv
 
-# Una semana grande (300 vehículos) con 10 camiones, guardado a archivo
-fleet_loading/.venv/bin/python scripts/sample_manifest.py \
-    --vehicles 300 --trucks 10 --out data/examples/manifiesto_10.csv
+# Un caso-scenario real: todos los vehículos registrados en el cantón 21701
+# durante la semana 9 de 2026 (2,734 vehículos), sin cap de submuestreo
+curl http://127.0.0.1:8000/api/manifests/real-episode.csv
 ```
 
-* `--vehicles 5..20` es **un episodio real completo** (una semana y un cantón
-  del SRI, submuestreado a 5-20 por el generador de escenarios); por debajo
-  del piso no existen episodios reales, y por encima el generador mezcla
-  varios episodios (una semana real en los archivos limpios tiene cientos de
-  vehículos).
-* `--trucks` acepta **cualquier** número: hasta 4 replica el rango de
-  entrenamiento; más allá es extrapolación (`same` = misma distribución de
-  capacidad, `constant-total` = mismo espacio total repartido entre más
-  camiones). Con más de 4 camiones solo los modelos pairwise lo sirven.
+* `real-episode.csv` es un **episodio real completo** del SRI: el registro
+  (año, semana, cantón) tal cual, sin el cap de <= 20 vehículos por episodio
+  que aplica la generación de episodios de entrenamiento
+  (`src/loading/scenarios.py`). Se puede pedir cualquier episodio del registro
+  con `?iso_year=&iso_week=&canton=`; por defecto sirve el cantón 21701,
+  semana 9 de 2026 (2,734 vehículos). Los episodios reales van de 1 a 2,774
+  vehículos, así que este es el caso de estrés real del problema.
+
+* El preset `profesor` reproduce la forma del ejemplo de intratabilidad del
+  enunciado (18 vehículos, 2 clases, 2 camiones de 6): Sedán -> AUTOMOVIL y
+  SUV -> JEEP (las clases que entrena el proyecto), con los CU reales del SRI
+  (1.0 y 1.1) en lugar de la abstracción del enunciado (2/3 y 1.0).
+  `profesor-escalado` es el mismo caso a 25 vehículos en 3 camiones (6, 7, 7).
+* La flota no va en el CSV: se envía en el cuerpo del `POST /api/distribute`
+  (`[6, 6]` para `profesor`, `[6, 7, 7]` para `profesor-escalado`).
+* Las filas se modelan con el mismo esquema pydantic que valida el API
+  (`ManifestVehicleIn`), de modo que el CSV siempre vuelve a entrar por
+  `parse_csv`. Los tests (`tests/api/test_examples.py`) crean estos
+  manifiestos como fixtures de pytest y verifican el round trip completo
+  contra el API (`TestClient` de FastAPI).
+* El resto de pruebas con manifiestos propios (cualquier composición de
+  clases y flota) se puede hacer subiendo un CSV propio a
+  `POST /api/manifest` (validación) o `POST /api/distribute` (plan).
 * Cada corrida anota su procedencia (semillas, episodios, cantones y flota) en
   un `.provenance.json` junto al CSV, o por stderr si se imprime a stdout —
   para que un manifiesto de prueba sea reproducible.

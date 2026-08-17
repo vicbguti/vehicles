@@ -5,6 +5,10 @@ Aplicación FastAPI del planificador de distribución.
 Carga el servicio de modelos bajo demanda (lazy) y expone:
 
 * ``GET  /api/health``        -- estado del servicio.
+* ``GET  /api/manifests/{nombre}.csv`` -- manifiesto de ejemplo (CSV) con
+  vehículos reales del SRI, listo para ``POST /api/distribute``.
+* ``GET  /api/manifests/real-episode.csv`` -- caso-scenario real: todos los
+  vehículos registrados en un (año, semana, cantón), sin cap de submuestreo.
 * ``POST /api/manifest``      -- valida un manifiesto (CSV o lista) y devuelve
   el estado por vehículo contra la flota dada.
 * ``POST /api/distribute``    -- genera el plan de distribución con el modelo.
@@ -29,7 +33,14 @@ import time
 
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 
+from src.api.examples import (
+    DEFAULT_REAL_EPISODE,
+    EXAMPLES,
+    build_example_csv,
+    build_real_episode_csv,
+)
 from src.api.models import ModelService, ModelUnavailableError
 from src.api.schemas import (
     DistributeIn,
@@ -82,6 +93,41 @@ def get_service() -> ModelService:
 @app.get("/api/health")
 def health() -> dict:
     return {"status": "ok", "model": DEFAULT_MODEL}
+
+
+@app.get("/api/manifests/real-episode.csv")
+def real_episode(
+    iso_year: int | None = None,
+    iso_week: int | None = None,
+    canton: str | None = None,
+) -> Response:
+    """Descarga un caso-scenario real: todos los vehículos registrados en el SRI
+    para un (año, semana, cantón), SIN cap de submuestreo. Sin parámetros usa
+    ``DEFAULT_REAL_EPISODE`` (cantón 21701, semana 9 de 2026, 2,734 vehículos);
+    con parámetros, cualquier episodio del registro.
+    """
+    iso_year, iso_week, canton = (
+        iso_year if iso_year is not None else DEFAULT_REAL_EPISODE[0],
+        iso_week if iso_week is not None else DEFAULT_REAL_EPISODE[1],
+        canton if canton is not None else DEFAULT_REAL_EPISODE[2],
+    )
+    csv = build_real_episode_csv(iso_year, iso_week, canton)
+    if not csv:
+        raise HTTPException(status_code=404, detail="El episodio no existe en el registro")
+    return Response(content=csv, media_type="text/csv")
+
+
+@app.get("/api/manifests/{name}.csv")
+def example_manifest(name: str) -> Response:
+    """Descarga un manifiesto de ejemplo (CSV) construido con vehículos reales del SRI.
+
+    El resultado se puede enviar tal cual a ``POST /api/distribute`` con la
+    flota indicada en ``docs/api.md`` (profesor: ``[6, 6]``; profesor-escalado:
+    ``[6, 7, 7]``).
+    """
+    if name not in EXAMPLES:
+        raise HTTPException(status_code=404, detail="Manifiesto de ejemplo desconocido")
+    return Response(content=build_example_csv(name), media_type="text/csv")
 
 
 @app.post("/api/manifest", response_model=ManifestOut)
